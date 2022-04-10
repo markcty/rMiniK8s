@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-mod pod;
+pub mod pod;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KubeObject {
