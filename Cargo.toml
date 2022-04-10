@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "rkubectl",
+    "api_server",
+    "rkubelet",
+    "resources",
+]
