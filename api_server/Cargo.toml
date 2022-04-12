@@ -3,6 +3,12 @@ name = "api_server"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+anyhow = "1.0.56"
+axum = "0.5.1"
+config = { version = "0.13.0", features = ["yaml"] }
+etcd-client = "0.9.0"
+lazy_static = "1.4.0"
+tokio = { version = "1.17.0", features = ["full"] }
+serde = { version = "1.0.136", features = ["derive"] }
+
