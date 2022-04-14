@@ -1,56 +1,69 @@
-use std::sync::Arc;
-
+use anyhow::{Context, Result};
 use axum::{routing::get, Extension, Router};
 use config::Config;
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use serde::Deserialize;
+use tracing;
+
+use etcd::EtcdConfig;
 
 mod etcd;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct ServerConfig {
-    etcd_url: String,
+    log_level: String,
+    etcd: EtcdConfig,
 }
 
-// load config
-lazy_static! {
-    static ref SERVER_CONFIG: ServerConfig = {
-        let settings = Config::builder()
-            .add_source(config::File::with_name("./examples/api-server/config.yaml"))
-            .build()
-            .unwrap();
-        settings.try_deserialize::<ServerConfig>().unwrap()
-    };
-}
-
-struct State {
-    etcd_client: etcd_client::Client,
+#[derive(Clone)]
+struct AppState {
+    etcd_pool: etcd::EtcdPool,
 }
 
 #[tokio::main]
-async fn main() {
-    let shared_state = Arc::new(Mutex::new(init_state().await));
+async fn main() -> Result<()> {
+    // read config
+    let config = Config::builder()
+        .add_source(config::File::with_name("./examples/api-server/config.yaml"))
+        .build()?
+        .try_deserialize::<ServerConfig>()
+        .with_context(|| format!("Failed to parse config"))?;
+
+    // init tracing
+    std::env::set_var("RUST_LOG", format!("api_server={}", config.log_level));
+    tracing_subscriber::fmt::init();
+
+    // init app state
+    let app_state = AppState::from_config(&config).await?;
 
     let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
-        .layer(Extension(shared_state));
+        .route("/", get(|| async { "Hello from api_server!" }))
+        .layer(Extension(app_state));
 
+    tracing::info!("Listening at 0.0.0.0:3000");
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown())
         .await
         .unwrap();
+
+    Ok(())
 }
 
-async fn init_state() -> State {
-    let etcd_client = etcd::connect_etcd().await.unwrap();
-    State { etcd_client }
+impl AppState {
+    async fn from_config(config: &ServerConfig) -> Result<AppState> {
+        let pool = config
+            .etcd
+            .create_pool()
+            .await
+            .with_context(|| format!("Failed to create etcd client pool"))?;
+
+        Ok(AppState { etcd_pool: pool })
+    }
 }
 
 async fn shutdown() {
     tokio::signal::ctrl_c()
         .await
         .expect("expect tokio signal ctrl-c");
-    println!("\nShutting down...")
+    tracing::info!("Shutting Down");
 }

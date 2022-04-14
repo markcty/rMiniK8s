@@ -1,1 +1,3 @@
-etcd_url: "localhost:2379"
+log_level: "Debug"
+etcd:
+  url: "localhost:2379"
