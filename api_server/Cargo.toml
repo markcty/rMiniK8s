@@ -15,3 +15,6 @@ deadpool = { version = "0.9.3", features = ["rt_tokio_1"] }
 async-trait = "0.1.53"
 tracing = "0.1.33"
 tracing-subscriber = "0.3.10"
+resources = { path = "../resources" }
+serde_json = "1.0.79"
+axum-macros = "0.2.0"

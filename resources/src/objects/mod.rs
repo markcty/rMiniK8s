@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 mod pod;
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "kind")]
 pub struct KubeObject {
     pub kind: String,
     pub metadata: Metadata,

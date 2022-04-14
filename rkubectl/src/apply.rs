@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::objects::KubeObject;
 use crate::{Url, CONFIG};
@@ -36,7 +36,7 @@ fn apply(object: &KubeObject) -> Result<String> {
     Ok(res.msg)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct ApplyRes {
     msg: String,
 }

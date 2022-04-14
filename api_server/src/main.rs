@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use axum::{routing::get, Extension, Router};
+use axum::{routing::post, Extension, Router};
 use config::Config;
 use serde::Deserialize;
 use tracing;
@@ -7,6 +7,7 @@ use tracing;
 use etcd::EtcdConfig;
 
 mod etcd;
+mod handler;
 
 #[derive(Debug, Deserialize)]
 struct ServerConfig {
@@ -15,7 +16,7 @@ struct ServerConfig {
 }
 
 #[derive(Clone)]
-struct AppState {
+pub struct AppState {
     etcd_pool: etcd::EtcdPool,
 }
 
@@ -36,11 +37,11 @@ async fn main() -> Result<()> {
     let app_state = AppState::from_config(&config).await?;
 
     let app = Router::new()
-        .route("/", get(|| async { "Hello from api_server!" }))
+        .route("/api/v1/pod/:name", post(handler::pod::apply))
         .layer(Extension(app_state));
 
-    tracing::info!("Listening at 0.0.0.0:3000");
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    tracing::info!("Listening at 0.0.0.0:8080");
+    axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown())
         .await
