@@ -7,8 +7,10 @@ use axum_macros::debug_handler;
 
 use resources::objects::KubeObject;
 
-use crate::handler::{ErrResponse, HandlerResult, Response};
-use crate::{etcd, AppState};
+use super::response::{HandlerResult, Response};
+use crate::AppState;
+
+use super::utils::etcd_put;
 
 #[debug_handler]
 pub async fn apply(
@@ -17,11 +19,8 @@ pub async fn apply(
     Json(payload): Json<KubeObject>,
     uri: Uri,
 ) -> HandlerResult<()> {
-    let mut client = app_state.get_client().await?;
     // TODO: validate payload and add status
-    etcd::put(&mut client, uri.to_string(), payload)
-        .await
-        .map_err(ErrResponse::from)?;
+    etcd_put(app_state, uri.to_string(), payload).await?;
     let res = Response::new(format!("pod/{} created", pod_name), None);
     Ok(Json(res))
 }
