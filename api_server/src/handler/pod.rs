@@ -7,9 +7,9 @@ use axum_macros::debug_handler;
 
 use resources::objects::KubeObject;
 
-use super::response::{HandlerResult, Response};
 use crate::AppState;
 
+use super::response::{HandlerResult, Response};
 use super::utils::etcd_put;
 
 #[debug_handler]

@@ -1,9 +1,10 @@
-pub mod pod;
-pub mod response;
-mod utils;
+use crate::{etcd::EtcdClient, AppState};
 
 use self::response::ErrResponse;
-use crate::{etcd::EtcdClient, AppState};
+
+pub mod pod;
+mod response;
+mod utils;
 
 impl AppState {
     pub async fn get_client(&self) -> Result<EtcdClient, ErrResponse> {
