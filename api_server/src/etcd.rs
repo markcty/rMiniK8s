@@ -45,7 +45,7 @@ impl managed::Manager for EtcdManager {
 
 impl EtcdConfig {
     pub async fn create_pool(&self) -> anyhow::Result<EtcdPool> {
-        let manager = EtcdManager::from_config(&self);
+        let manager = EtcdManager::from_config(self);
         let pool = managed::Pool::builder(manager).build()?;
         Ok(pool)
     }

@@ -4,7 +4,6 @@ use anyhow::{Context, Result};
 use axum::{routing::post, Extension, Router};
 use config::Config;
 use serde::Deserialize;
-use tracing;
 
 use etcd::EtcdConfig;
 
@@ -28,7 +27,7 @@ async fn main() -> Result<()> {
         .add_source(config::File::with_name("./examples/api-server/config.yaml"))
         .build()?
         .try_deserialize::<ServerConfig>()
-        .with_context(|| format!("Failed to parse config"))?;
+        .with_context(|| "Failed to parse config".to_string())?;
 
     // init tracing
     std::env::set_var("RUST_LOG", format!("api_server={}", config.log_level));
@@ -58,7 +57,7 @@ impl AppState {
             .etcd
             .create_pool()
             .await
-            .with_context(|| format!("Failed to create etcd client pool"))?;
+            .with_context(|| "Failed to create etcd client pool".to_string())?;
 
         Ok(AppState { etcd_pool: pool })
     }
