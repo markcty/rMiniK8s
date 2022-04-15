@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::extract::Path;
 use axum::http::Uri;
 use axum::{Extension, Json};
@@ -10,7 +12,7 @@ use crate::{etcd, AppState};
 
 #[debug_handler]
 pub async fn apply(
-    Extension(app_state): Extension<AppState>,
+    Extension(app_state): Extension<Arc<AppState>>,
     Path(pod_name): Path<String>,
     Json(payload): Json<KubeObject>,
     uri: Uri,
