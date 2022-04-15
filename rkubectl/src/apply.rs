@@ -44,7 +44,7 @@ struct ApplyRes {
 fn gen_url(object: &KubeObject) -> Result<Url> {
     let url = CONFIG.base_url.to_owned();
     let path = format!(
-        "{}/{}",
+        "{}s/{}",
         object.kind.to_lowercase(),
         object.metadata.name.to_lowercase()
     );

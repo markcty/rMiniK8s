@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
     let shared_state = Arc::new(app_state);
 
     let app = Router::new()
-        .route("/api/v1/pod/:name", post(handler::pod::apply))
+        .route("/api/v1/pods/:name", post(handler::pod::apply))
         .layer(Extension(shared_state));
 
     tracing::info!("Listening at 0.0.0.0:8080");
