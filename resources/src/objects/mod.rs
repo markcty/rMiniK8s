@@ -6,13 +6,20 @@ pub mod pod;
 pub struct KubeObject {
     pub kind: String,
     pub metadata: Metadata,
-    spec: KubeSpec,
+    pub spec: KubeSpec,
+    status: Option<KubeStatus>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum KubeSpec {
     Pod(pod::PodSpec),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum KubeStatus {
+    Pod(pod::PodStatus),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
