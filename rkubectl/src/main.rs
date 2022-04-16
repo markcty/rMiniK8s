@@ -6,7 +6,6 @@ use std::env;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use reqwest::Url;
-
 use resources::objects;
 
 mod apply;

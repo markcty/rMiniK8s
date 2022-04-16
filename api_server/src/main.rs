@@ -3,9 +3,8 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::{routing::post, Extension, Router};
 use config::Config;
-use serde::Deserialize;
-
 use etcd::EtcdConfig;
+use serde::Deserialize;
 
 mod etcd;
 mod handler;
@@ -59,7 +58,9 @@ impl AppState {
             .await
             .with_context(|| "Failed to create etcd client pool".to_string())?;
 
-        Ok(AppState { etcd_pool: pool })
+        Ok(AppState {
+            etcd_pool: pool,
+        })
     }
 }
 

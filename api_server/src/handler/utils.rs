@@ -1,9 +1,9 @@
-use serde::Serialize;
 use std::sync::Arc;
 
-use crate::{etcd, AppState};
+use serde::Serialize;
 
 use super::response::ErrResponse;
+use crate::{etcd, AppState};
 
 pub async fn etcd_put(
     app_state: Arc<AppState>,

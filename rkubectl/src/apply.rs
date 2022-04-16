@@ -1,12 +1,10 @@
-use std::fs::File;
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
 use serde::Deserialize;
 
-use crate::objects::KubeObject;
-use crate::{Url, CONFIG};
+use crate::{objects::KubeObject, Url, CONFIG};
 
 #[derive(Args)]
 pub struct Arg {

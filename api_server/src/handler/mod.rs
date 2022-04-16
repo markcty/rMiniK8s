@@ -1,6 +1,5 @@
-use crate::{etcd::EtcdClient, AppState};
-
 use self::response::ErrResponse;
+use crate::{etcd::EtcdClient, AppState};
 
 pub mod pod;
 mod response;

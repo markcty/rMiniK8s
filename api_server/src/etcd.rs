@@ -53,7 +53,10 @@ impl EtcdConfig {
 
 impl EtcdError {
     pub fn new(msg: String, cause: Option<String>) -> Self {
-        Self { msg, cause }
+        Self {
+            msg,
+            cause,
+        }
     }
 }
 

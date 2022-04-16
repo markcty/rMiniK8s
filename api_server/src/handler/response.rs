@@ -1,6 +1,4 @@
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::Json;
+use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::Serialize;
 
 use crate::etcd::EtcdError;
@@ -24,13 +22,19 @@ where
     T: Serialize,
 {
     pub fn new(msg: String, data: Option<T>) -> Self {
-        Self { msg, data }
+        Self {
+            msg,
+            data,
+        }
     }
 }
 
 impl ErrResponse {
     pub fn new(msg: String, cause: Option<String>) -> Self {
-        Self { msg, cause }
+        Self {
+            msg,
+            cause,
+        }
     }
 }
 

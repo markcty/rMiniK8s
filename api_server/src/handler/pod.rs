@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use axum::extract::Path;
-use axum::http::Uri;
-use axum::{Extension, Json};
+use axum::{extract::Path, http::Uri, Extension, Json};
 use axum_macros::debug_handler;
-
 use resources::objects::KubeObject;
 
+use super::{
+    response::{HandlerResult, Response},
+    utils::etcd_put,
+};
 use crate::AppState;
-
-use super::response::{HandlerResult, Response};
-use super::utils::etcd_put;
 
 #[debug_handler]
 pub async fn apply(
