@@ -1,16 +1,10 @@
-use bollard::Docker;
-use lazy_static::lazy_static;
 use resources::objects::{pod::*, KubeObject, KubeSpec, Metadata};
 
+mod config;
 mod docker;
 mod pod;
 
 use pod::Pod;
-
-lazy_static! {
-    pub static ref DOCKER: Docker =
-        Docker::connect_with_local_defaults().expect("Failed to connect to docker daemon");
-}
 
 #[tokio::main]
 async fn main() {
@@ -37,11 +31,14 @@ async fn main() {
     let object = KubeObject {
         metadata: Metadata {
             name: "nginx".to_string(),
+            ..Default::default()
         },
         spec: pod_spec,
         status: None,
     };
-    let pod = Pod::create(object).await.unwrap();
+    let mut pod = Pod::create(object).await.unwrap();
     println!("{:#?}", pod);
     pod.start().await.unwrap();
+    pod.update_status().await.unwrap();
+    println!("{:#?}", pod);
 }

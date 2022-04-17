@@ -8,7 +8,7 @@ use futures::StreamExt;
 use resources::objects::pod::ContainerStatus;
 use serde::Serialize;
 
-use crate::DOCKER;
+use crate::config::DOCKER;
 
 #[derive(Debug)]
 pub struct Image {
@@ -43,14 +43,14 @@ impl Image {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Container {
     /// ID or name of the container
     id: String,
 }
 
 impl Container {
-    pub fn _new(id: String) -> Self {
+    pub fn new(id: String) -> Self {
         Self {
             id,
         }

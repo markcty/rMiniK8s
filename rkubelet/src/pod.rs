@@ -8,14 +8,19 @@ use futures::future::try_join_all;
 use resources::objects::{
     pod,
     pod::{ContainerStatus, PodSpec, PodStatus},
-    KubeObject, KubeSpec, KubeStatus,
+    KubeObject, KubeSpec, KubeStatus, Metadata,
 };
+use uuid::Uuid;
 
-use crate::docker::{Container, Image};
+use crate::{
+    config::{CONTAINER_NAME_PREFIX, PAUSE_CONTAINER_NAME, PAUSE_IMAGE_NAME},
+    docker::{Container, Image},
+};
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Pod {
+    metadata: Metadata,
     spec: PodSpec,
     status: PodStatus,
 }
@@ -33,6 +38,7 @@ impl Pod {
             None => panic!("Pod::load:: status is missing"),
         };
         Pod {
+            metadata: object.metadata,
             spec,
             status,
         }
@@ -41,16 +47,22 @@ impl Pod {
     pub async fn create(object: KubeObject) -> Result<Self, bollard::errors::Error> {
         // TODO: Change to `match` after adding more types
         let KubeSpec::Pod(spec) = object.spec;
-
         tracing::info!("Creating pod containers...");
-        let pause_container = Pod::create_pause_container().await?;
-        let containers = Pod::create_containers(&spec.containers, &pause_container).await?;
-        let status = Pod::get_status(&pause_container, &containers).await?;
 
-        Ok(Self {
+        let mut metadata = object.metadata;
+        let uid = Uuid::new_v4();
+        metadata.uid = Some(uid);
+
+        let mut pod = Self {
+            metadata,
             spec,
-            status,
-        })
+            status: PodStatus::default(),
+        };
+        let pause_container = pod.create_pause_container().await?;
+        pod.create_containers(&pause_container).await?;
+        pod.update_status().await?;
+
+        Ok(pod)
     }
 
     #[allow(dead_code)]
@@ -68,6 +80,7 @@ impl Pod {
     }
 
     async fn create_container(
+        &self,
         container: &pod::Container,
         pause_container: &Container,
     ) -> Result<Container, bollard::errors::Error> {
@@ -84,22 +97,23 @@ impl Pod {
             host_config,
             ..Default::default()
         };
-        Container::create(Some(&container.name), config).await
+        let name = Some(self.unique_container_name(&container.name));
+        Container::create(name, config).await
     }
 
     async fn create_containers(
-        containers: &[pod::Container],
+        &self,
         pause_container: &Container,
     ) -> Result<Vec<Container>, bollard::errors::Error> {
         let mut tasks = vec![];
-        for container in containers {
-            tasks.push(Pod::create_container(container, pause_container));
+        for container in &self.spec.containers {
+            tasks.push(self.create_container(container, pause_container));
         }
         try_join_all(tasks).await
     }
 
-    async fn create_pause_container() -> Result<Container, bollard::errors::Error> {
-        let image = Image::create("kubernetes/pause:latest").await;
+    async fn create_pause_container(&self) -> Result<Container, bollard::errors::Error> {
+        let image = Image::create(PAUSE_IMAGE_NAME).await;
         let host_config = Some(HostConfig {
             ipc_mode: Some("shareable".to_string()),
             ..Default::default()
@@ -109,7 +123,8 @@ impl Pod {
             host_config,
             ..Default::default()
         };
-        let container = Container::create(Some("pause"), config).await?;
+        let name = Some(self.unique_container_name(PAUSE_CONTAINER_NAME));
+        let container = Container::create(name, config).await?;
         container.start().await?;
         Ok(container)
     }
@@ -126,31 +141,30 @@ impl Pod {
     }
 
     async fn inspect_containers(
-        containers: &[Container],
+        &self,
     ) -> Result<Vec<ContainerInspectResponse>, bollard::errors::Error> {
-        let mut tasks = vec![];
-        for container in containers {
-            tasks.push(container.inspect());
-        }
+        let containers = self.containers();
+        let tasks = containers.iter().map(|c| c.inspect()).collect::<Vec<_>>();
         try_join_all(tasks).await
     }
 
-    async fn get_status(
-        pause_container: &Container,
-        containers: &[Container],
-    ) -> Result<PodStatus, bollard::errors::Error> {
-        let response = pause_container.inspect().await?;
+    pub async fn update_status(&mut self) -> Result<(), bollard::errors::Error> {
+        let response = self.pause_container().inspect().await?;
         let pod_ip = Pod::get_ip(&response).map(|ip| ip.to_owned());
-        let container_statuses = Pod::inspect_containers(containers)
+        // TODO: strip uid off container names
+        let container_statuses = self
+            .inspect_containers()
             .await?
             .into_iter()
             .map(ContainerStatus::from)
             .collect();
-        Ok(PodStatus {
+        // TODO: determine pod conditions
+        self.status = PodStatus {
             pod_ip,
             container_statuses,
             ..Default::default()
-        })
+        };
+        Ok(())
     }
 
     fn get_ip(response: &ContainerInspectResponse) -> Option<&String> {
@@ -162,5 +176,22 @@ impl Pod {
             .get("bridge")?
             .ip_address
             .as_ref()
+    }
+
+    fn unique_container_name(&self, container_name: &str) -> String {
+        let uid = self.metadata.uid.expect("Pod with no uid");
+        format!("{}_{}-{}", CONTAINER_NAME_PREFIX, container_name, uid)
+    }
+
+    fn pause_container(&self) -> Container {
+        Container::new(self.unique_container_name(PAUSE_CONTAINER_NAME))
+    }
+
+    fn containers(&self) -> Vec<Container> {
+        self.spec
+            .containers
+            .iter()
+            .map(|container| Container::new(self.unique_container_name(&container.name)))
+            .collect()
     }
 }
