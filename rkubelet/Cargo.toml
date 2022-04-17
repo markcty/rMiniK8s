@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4.0"
+serde = "1.0.136"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1.33"
 tracing-subscriber = "0.3.10"

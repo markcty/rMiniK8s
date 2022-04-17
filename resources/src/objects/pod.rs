@@ -1,5 +1,6 @@
 use std::{collections::HashMap, default::Default};
 
+use bollard::models::{ContainerInspectResponse, ContainerStateStatusEnum};
 use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
@@ -124,6 +125,24 @@ pub enum ContainerState {
     Waiting,
 }
 
+impl From<Option<bollard::models::ContainerState>> for ContainerState {
+    fn from(state: Option<bollard::models::ContainerState>) -> Self {
+        match state {
+            Some(state) => match state.status {
+                Some(status) => match status {
+                    ContainerStateStatusEnum::RUNNING => ContainerState::Running,
+                    ContainerStateStatusEnum::EXITED | ContainerStateStatusEnum::DEAD => {
+                        ContainerState::Terminated
+                    },
+                    _ => ContainerState::Waiting,
+                },
+                None => ContainerState::Waiting,
+            },
+            None => ContainerState::Waiting,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerStatus {
@@ -137,4 +156,15 @@ pub struct ContainerStatus {
     pub container_id: String,
     /// State is the current state of the container.
     pub state: ContainerState,
+}
+
+impl From<ContainerInspectResponse> for ContainerStatus {
+    fn from(response: ContainerInspectResponse) -> Self {
+        ContainerStatus {
+            name: response.name.expect("Container name not found"),
+            image: response.image.expect("Container image not found"),
+            container_id: response.id.expect("Container ID not found"),
+            state: ContainerState::from(response.state),
+        }
+    }
 }

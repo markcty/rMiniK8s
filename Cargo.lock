@@ -1423,6 +1423,7 @@ dependencies = [
 name = "resources"
 version = "0.1.0"
 dependencies = [
+ "bollard",
  "chrono",
  "serde",
  "serde_yaml",
@@ -1454,7 +1455,9 @@ version = "0.1.0"
 dependencies = [
  "bollard",
  "futures",
+ "lazy_static",
  "resources",
+ "serde",
  "tokio",
  "tracing",
  "tracing-subscriber",
