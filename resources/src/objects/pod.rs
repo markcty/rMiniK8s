@@ -1,5 +1,8 @@
-use chrono::NaiveDateTime;
+use std::{collections::HashMap, default::Default};
+
+use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
+use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PodSpec {
@@ -48,10 +51,27 @@ pub struct PodStatus {
     #[serde(rename = "podIP")]
     pub pod_ip: Option<String>,
     /// Current service state of pod.
-    pub conditions: Vec<PodCondition>,
+    pub conditions: HashMap<PodConditionType, PodCondition>,
     /// The list has one entry per container in the manifest.
     /// Each entry is currently the output of docker inspect.
     pub container_statuses: Vec<ContainerStatus>,
+}
+
+impl Default for PodStatus {
+    fn default() -> Self {
+        let mut conditions = HashMap::new();
+        PodConditionType::iter().for_each(|c| {
+            conditions.insert(c, PodCondition::default());
+        });
+        PodStatus {
+            host_ip: None,
+            start_time: Local::now().naive_utc(),
+            phase: PodPhase::Pending,
+            pod_ip: None,
+            conditions,
+            container_statuses: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,7 +97,7 @@ pub enum PodPhase {
     Succeeded,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, EnumIter)]
 pub enum PodConditionType {
     /// All containers in the pod are ready.
     ContainersReady,
@@ -90,14 +110,11 @@ pub enum PodConditionType {
     Ready,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PodCondition {
     /// Status is the status of the condition.
     /// Can be True, False, Unknown.
     pub status: bool,
-    /// Type is the type of the condition.
-    #[serde(rename = "type")]
-    pub type_: PodConditionType,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
