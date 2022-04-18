@@ -8,7 +8,7 @@ use futures::future::try_join_all;
 use resources::objects::{
     pod,
     pod::{ContainerStatus, PodSpec, PodStatus},
-    KubeObject, KubeSpec, KubeStatus, Metadata,
+    KubeObject, KubeResource, Metadata,
 };
 use uuid::Uuid;
 
@@ -29,24 +29,18 @@ impl Pod {
     #[allow(dead_code)]
     pub fn load(object: KubeObject) -> Self {
         // TODO: Change to `match` after adding more types
-        let KubeSpec::Pod(spec) = object.spec;
-        let status = match object.status {
-            Some(status) => match status {
-                KubeStatus::Pod(status) => status,
-                // _ => panic!("Pod::load: object.status is not a Pod"),
-            },
-            None => panic!("Pod::load:: status is missing"),
-        };
+        let KubeResource::Pod(resource) = object.resource;
+        let status = resource.status.expect("Pod::load:: status is missing");
         Pod {
             metadata: object.metadata,
-            spec,
+            spec: resource.spec,
             status,
         }
     }
 
     pub async fn create(object: KubeObject) -> Result<Self, bollard::errors::Error> {
         // TODO: Change to `match` after adding more types
-        let KubeSpec::Pod(spec) = object.spec;
+        let KubeResource::Pod(resource) = object.resource;
         tracing::info!("Creating pod containers...");
 
         let mut metadata = object.metadata;
@@ -55,7 +49,7 @@ impl Pod {
 
         let mut pod = Self {
             metadata,
-            spec,
+            spec: resource.spec,
             status: PodStatus::default(),
         };
         let pause_container = pod.create_pause_container().await?;

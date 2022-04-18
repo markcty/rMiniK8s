@@ -6,6 +6,12 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Pod {
+    pub spec: PodSpec,
+    pub status: Option<PodStatus>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PodSpec {
     /// List of containers belonging to the pod.
     /// Containers cannot currently be added or removed.

@@ -1,4 +1,7 @@
-use resources::objects::{pod::*, KubeObject, KubeSpec, Metadata};
+use resources::objects::{
+    pod::{Pod as PodResource, *},
+    KubeObject, KubeResource, Metadata,
+};
 
 mod config;
 mod docker;
@@ -10,7 +13,7 @@ use pod::Pod;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let pod_spec = KubeSpec::Pod(PodSpec {
+    let pod_spec = PodSpec {
         containers: vec![
             Container {
                 name: "nginx".to_string(),
@@ -27,14 +30,16 @@ async fn main() {
                 }],
             },
         ],
-    });
+    };
     let object = KubeObject {
         metadata: Metadata {
             name: "nginx".to_string(),
             ..Default::default()
         },
-        spec: pod_spec,
-        status: None,
+        resource: KubeResource::Pod(PodResource {
+            spec: pod_spec,
+            status: None,
+        }),
     };
     let mut pod = Pod::create(object).await.unwrap();
     println!("{:#?}", pod);
