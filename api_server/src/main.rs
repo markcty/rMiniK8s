@@ -1,7 +1,10 @@
 use std::sync::{Arc, RwLock};
 
 use anyhow::{Context, Result};
-use axum::{routing::post, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use config::Config;
 use etcd::EtcdConfig;
 use resources::objects::KubeObject;
@@ -40,6 +43,7 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/api/v1/pods/:name", post(handler::pod::apply))
+        .route("/api/v1/nodes", get(handler::node::list))
         .layer(Extension(shared_state));
 
     tracing::info!("Listening at 0.0.0.0:8080");

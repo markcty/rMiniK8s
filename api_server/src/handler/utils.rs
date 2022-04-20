@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use etcd_client::{GetOptions, GetResponse};
 use resources::objects::pod::{Pod, PodPhase, PodStatus};
 use serde::Serialize;
 
@@ -16,6 +17,17 @@ pub async fn etcd_put(
         .await
         .map_err(ErrResponse::from)?;
     Ok(())
+}
+
+pub async fn etcd_get_prefix(
+    app_state: &Arc<AppState>,
+    prefix: String,
+) -> Result<GetResponse, ErrResponse> {
+    let mut client = app_state.get_client().await?;
+    let res = etcd::get(&mut client, prefix, Some(GetOptions::new().with_prefix()))
+        .await
+        .map_err(ErrResponse::from)?;
+    Ok(res)
 }
 
 pub fn update_pod_phase(pod: &mut Pod, new_phase: PodPhase) {

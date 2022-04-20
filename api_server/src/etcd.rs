@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use deadpool::managed;
-use etcd_client::Client;
+use etcd_client::{Client, GetOptions, GetResponse, KeyValue};
 use serde::{Deserialize, Serialize};
 
 pub type EtcdPool = managed::Pool<EtcdManager>;
@@ -73,4 +73,35 @@ pub async fn put(client: &mut EtcdClient, key: String, value: impl Serialize) ->
         .map_err(|err| EtcdError::new("Failed to put".into(), Some(err.to_string())))?;
     tracing::debug!("Successfully put");
     Ok(())
+}
+
+pub async fn get(
+    client: &mut EtcdClient,
+    key: String,
+    option: Option<GetOptions>,
+) -> Result<GetResponse> {
+    let res = client
+        .get(key, option)
+        .await
+        .map_err(|err| EtcdError::new("Failed to get".into(), Some(err.to_string())))?;
+    tracing::debug!("Successfully get");
+    Ok(res)
+}
+
+pub fn kv_to_str(kv: &KeyValue) -> Result<(String, String)> {
+    let (key_str, val_str) = (
+        kv.key_str().map_err(|err| {
+            EtcdError::new(
+                "Failed to convert key to String".into(),
+                Some(err.to_string()),
+            )
+        })?,
+        kv.value_str().map_err(|err| {
+            EtcdError::new(
+                "Failed to convert value to String".into(),
+                Some(err.to_string()),
+            )
+        })?,
+    );
+    Ok((key_str.to_string(), val_str.to_string()))
 }
