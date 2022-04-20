@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use anyhow::{Context, Result};
 use axum::{routing::post, Extension, Router};
 use config::Config;
 use etcd::EtcdConfig;
+use resources::objects::KubeObject;
 use serde::Deserialize;
 
 mod etcd;
@@ -17,6 +18,7 @@ struct ServerConfig {
 
 pub struct AppState {
     etcd_pool: etcd::EtcdPool,
+    schedule_queue: RwLock<Vec<KubeObject>>,
 }
 
 #[tokio::main]
@@ -60,6 +62,7 @@ impl AppState {
 
         Ok(AppState {
             etcd_pool: pool,
+            schedule_queue: RwLock::new(vec![]),
         })
     }
 }

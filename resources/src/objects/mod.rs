@@ -4,20 +4,20 @@ use uuid::Uuid;
 
 pub mod pod;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KubeObject {
     pub metadata: Metadata,
     #[serde(flatten)]
     pub resource: KubeResource,
 }
 
-#[derive(Debug, Serialize, Deserialize, Display)]
+#[derive(Debug, Serialize, Deserialize, Display, Clone)]
 #[serde(tag = "kind")]
 pub enum KubeResource {
     Pod(pod::Pod),
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct Metadata {
     /// Name must be unique within a namespace.
     /// Is required when creating resources,

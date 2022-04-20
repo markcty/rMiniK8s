@@ -5,13 +5,13 @@ use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pod {
     pub spec: PodSpec,
     pub status: Option<PodStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PodSpec {
     /// List of containers belonging to the pod.
     /// Containers cannot currently be added or removed.
@@ -19,7 +19,7 @@ pub struct PodSpec {
     pub containers: Vec<Container>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Container {
     /// Name of the container specified as a DNS_LABEL.
     /// Each container in a pod must have a unique name (DNS_LABEL).
@@ -31,7 +31,7 @@ pub struct Container {
     pub ports: Vec<ContainerPort>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerPort {
     /// Number of port to expose on the pod's IP address.
@@ -39,7 +39,7 @@ pub struct ContainerPort {
     pub container_port: u16,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PodStatus {
     /// IP address of the host to which the pod is assigned.
@@ -81,7 +81,7 @@ impl Default for PodStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PodPhase {
     /// All containers in the pod have terminated,
     /// and at least one container has terminated in failure.
@@ -104,7 +104,7 @@ pub enum PodPhase {
     Succeeded,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, EnumIter, Clone)]
 pub enum PodConditionType {
     /// All containers in the pod are ready.
     ContainersReady,
@@ -117,14 +117,14 @@ pub enum PodConditionType {
     Ready,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct PodCondition {
     /// Status is the status of the condition.
     /// Can be True, False, Unknown.
     pub status: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ContainerState {
     Running,
     Terminated,
@@ -149,7 +149,7 @@ impl From<Option<bollard::models::ContainerState>> for ContainerState {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerStatus {
     /// This must be a DNS_LABEL.

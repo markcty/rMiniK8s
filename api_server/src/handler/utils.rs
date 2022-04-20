@@ -6,7 +6,7 @@ use super::response::ErrResponse;
 use crate::{etcd, AppState};
 
 pub async fn etcd_put(
-    app_state: Arc<AppState>,
+    app_state: &Arc<AppState>,
     key: String,
     val: impl Serialize,
 ) -> Result<(), ErrResponse> {

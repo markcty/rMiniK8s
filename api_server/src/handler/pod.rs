@@ -18,7 +18,11 @@ pub async fn apply(
     uri: Uri,
 ) -> HandlerResult<()> {
     // TODO: validate payload and add status
-    etcd_put(app_state, uri.to_string(), payload).await?;
+    etcd_put(&app_state, uri.to_string(), payload.clone()).await?;
     let res = Response::new(format!("pod/{} created", pod_name), None);
+
+    // TODO: fill business logic and error handling
+    let queue = &mut app_state.schedule_queue.write().unwrap();
+    queue.push(payload);
     Ok(Json(res))
 }
