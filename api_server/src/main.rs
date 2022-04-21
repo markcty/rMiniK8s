@@ -44,6 +44,7 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/api/v1/pods/:name", post(handler::pod::apply))
         .route("/api/v1/nodes", get(handler::node::list))
+        .route("/api/v1/bindings/:name", post(handler::binding::bind))
         .layer(Extension(shared_state));
 
     tracing::info!("Listening at 0.0.0.0:8080");

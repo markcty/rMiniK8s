@@ -1,6 +1,7 @@
 use self::response::ErrResponse;
 use crate::{etcd::EtcdClient, AppState};
 
+pub mod binding;
 pub mod node;
 pub mod pod;
 mod response;
