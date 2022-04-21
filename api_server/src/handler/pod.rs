@@ -6,9 +6,9 @@ use resources::objects::{pod::PodPhase, KubeObject, KubeResource};
 
 use super::{
     response::{ErrResponse, HandlerResult, Response},
-    utils::{etcd_put, update_pod_phase},
+    utils::*,
 };
-use crate::AppState;
+use crate::{etcd::kv_to_str, AppState};
 
 #[debug_handler]
 pub async fn apply(
@@ -17,7 +17,7 @@ pub async fn apply(
     Json(mut payload): Json<KubeObject>,
     uri: Uri,
 ) -> HandlerResult<()> {
-    // TODO: validate payload and add status
+    // TODO: validate payload
     // Because we have only one type in KubeResource now,
     // there will be a warning temporarily.
     #[allow(irrefutable_let_patterns)]
@@ -39,4 +39,20 @@ pub async fn apply(
             )),
         ));
     }
+}
+
+#[debug_handler]
+pub async fn list(
+    Extension(app_state): Extension<Arc<AppState>>,
+    uri: Uri,
+) -> HandlerResult<Vec<String>> {
+    // uri: /api/v1/pods
+    let etcd_res = etcd_get_prefix(&app_state, uri.to_string()).await?;
+    let mut pods: Vec<String> = Vec::new();
+    for kv in etcd_res.kvs() {
+        let (_, val_str) = kv_to_str(kv)?;
+        pods.push(val_str.to_string());
+    }
+    let res = Response::new("get pods successfully".to_string(), Some(pods));
+    Ok(Json(res))
 }
