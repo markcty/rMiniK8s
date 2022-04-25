@@ -45,14 +45,24 @@ pub async fn apply(
 pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
     uri: Uri,
-) -> HandlerResult<Vec<String>> {
+) -> HandlerResult<Vec<KubeObject>> {
     // uri: /api/v1/pods
     let etcd_res = etcd_get_prefix(&app_state, uri.to_string()).await?;
-    let mut pods: Vec<String> = Vec::new();
+    let mut pods: Vec<KubeObject> = Vec::new();
+    let mut msg = "get pods successfully".to_string();
     for kv in etcd_res.kvs() {
         let (_, val_str) = kv_to_str(kv)?;
-        pods.push(val_str.to_string());
+        let pod: KubeObject = serde_json::from_str(val_str.as_str()).map_err(|err| {
+            ErrResponse::new("failed to deserialize".into(), Some(err.to_string()))
+        })?;
+        if pod.kind() == "pod" {
+            pods.push(pod);
+        } else {
+            // only report the error, then continue to process other objects
+            tracing::error!("There are some errors about the kind of objects");
+            msg = "There are some errors about the kind of objects".to_string();
+        }
     }
-    let res = Response::new("get pods successfully".to_string(), Some(pods));
+    let res = Response::new(msg, Some(pods));
     Ok(Json(res))
 }

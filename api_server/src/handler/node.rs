@@ -16,6 +16,7 @@ pub async fn list(
 ) -> HandlerResult<Vec<String>> {
     // uri: /api/v1/nodes
     let etcd_res = etcd_get_prefix(&app_state, uri.to_string()).await?;
+    // TODO: deserialize the value to Node KubeObjects
     let mut nodes: Vec<String> = Vec::new();
     for kv in etcd_res.kvs() {
         let (_, val_str) = kv_to_str(kv)?;

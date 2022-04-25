@@ -8,7 +8,7 @@ use resources::objects::{
 };
 
 use super::{
-    response::{HandlerResult, Response},
+    response::{ErrResponse, HandlerResult, Response},
     utils::*,
 };
 use crate::AppState;
@@ -20,7 +20,11 @@ pub async fn bind(
     Path(pod_name): Path<String>,
     Json(payload): Json<KubeObject>,
     uri: Uri,
-) -> HandlerResult<Vec<String>> {
+) -> HandlerResult<()> {
+    if payload.kind() != "binding" {
+        let res = ErrResponse::new("object type error".to_string(), None);
+        return Err(res);
+    }
     // uri: /api/v1/bindings/:pod_name
     // get pod
     let mut pod = get_pod_from_etcd(&app_state, pod_name.clone()).await?;
