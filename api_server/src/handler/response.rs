@@ -41,7 +41,7 @@ impl ErrResponse {
 impl From<EtcdError> for ErrResponse {
     fn from(err: EtcdError) -> Self {
         if let Some(cause) = err.cause {
-            tracing::debug!("Etcd Error: {}\nCaused by: \n{}", err.msg, cause);
+            tracing::debug!("Etcd Error: {}, caused by: {}", err.msg, cause);
         } else {
             tracing::debug!("Etcd Error: {}", err.msg);
         }

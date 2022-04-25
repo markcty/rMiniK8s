@@ -1,7 +1,10 @@
 use std::sync::{Arc, RwLock};
 
 use anyhow::{Context, Result};
-use axum::{routing::post, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use config::Config;
 use etcd::EtcdConfig;
 use resources::objects::KubeObject;
@@ -39,6 +42,7 @@ async fn main() -> Result<()> {
     let shared_state = Arc::new(app_state);
 
     let app = Router::new()
+        .route("/api/v1/watch/pods", get(handler::pod::watch_all))
         .route("/api/v1/pods/:name", post(handler::pod::apply))
         .layer(Extension(shared_state));
 

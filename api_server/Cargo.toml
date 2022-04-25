@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.56"
-axum = "0.5.1"
+axum = { version = "0.5.1", features = ["ws"] }
 config = { version = "0.13.0", features = ["yaml"] }
 etcd-client = "0.9.0"
 lazy_static = "1.4.0"
@@ -18,3 +18,4 @@ tracing-subscriber = "0.3.10"
 resources = { path = "../resources" }
 serde_json = "1.0.79"
 axum-macros = "0.2.0"
+futures = "0.3.21"
