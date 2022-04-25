@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use deadpool::managed;
-use etcd_client::{Client, GetOptions, GetResponse, KeyValue};
+use etcd_client::{Client, GetOptions, GetResponse, KeyValue, PutOptions};
 use serde::{Deserialize, Serialize};
 
 pub type EtcdPool = managed::Pool<EtcdManager>;
@@ -63,12 +63,17 @@ impl EtcdError {
 // all etcd error should be encapsulated into EtcdError
 type Result<T> = core::result::Result<T, EtcdError>;
 
-pub async fn put(client: &mut EtcdClient, key: String, value: impl Serialize) -> Result<()> {
+pub async fn put(
+    client: &mut EtcdClient,
+    key: String,
+    value: impl Serialize,
+    option: Option<PutOptions>,
+) -> Result<()> {
     let value = serde_json::to_string(&value)
         .map_err(|err| EtcdError::new("Failed to serialize".into(), Some(err.to_string())))?;
 
     let _ = client
-        .put(key, value, None)
+        .put(key, value, option)
         .await
         .map_err(|err| EtcdError::new("Failed to put".into(), Some(err.to_string())))?;
     tracing::debug!("Successfully put");

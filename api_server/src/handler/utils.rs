@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use etcd_client::{GetOptions, GetResponse};
-use resources::objects::pod::{Pod, PodCondition, PodConditionType, PodPhase, PodStatus};
+use resources::objects::{
+    pod::{Pod, PodStatus},
+    KubeObject,
+};
 use serde::Serialize;
 
 use super::response::ErrResponse;
@@ -10,19 +13,19 @@ use crate::{
     AppState,
 };
 
-pub async fn etcd_put(
+pub async fn put(
     app_state: &Arc<AppState>,
     key: String,
     val: impl Serialize,
 ) -> Result<(), ErrResponse> {
     let mut client = app_state.get_client().await?;
-    etcd::put(&mut client, key, val)
+    etcd::put(&mut client, key, val, None)
         .await
         .map_err(ErrResponse::from)?;
     Ok(())
 }
 
-pub async fn etcd_get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, ErrResponse> {
+pub async fn get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, ErrResponse> {
     let mut client = app_state.get_client().await?;
     let res = etcd::get(&mut client, key, None)
         .await
@@ -30,7 +33,7 @@ pub async fn etcd_get(app_state: &Arc<AppState>, key: String) -> Result<GetRespo
     Ok(res)
 }
 
-pub async fn etcd_get_prefix(
+pub async fn get_prefix(
     app_state: &Arc<AppState>,
     prefix: String,
 ) -> Result<GetResponse, ErrResponse> {
@@ -41,26 +44,15 @@ pub async fn etcd_get_prefix(
     Ok(res)
 }
 
-pub async fn get_pod_from_etcd(
+pub async fn get_object_from_etcd(
     app_state: &Arc<AppState>,
-    pod_name: String,
-) -> Result<Pod, ErrResponse> {
-    let pod_uri = format!("/api/v1/pods/{}", pod_name);
-    let etcd_res = etcd_get(app_state, pod_uri).await?;
-    let pod_str = get_value_str(etcd_res)?;
-    let pod: Pod = serde_json::from_str(pod_str.as_str())
+    uri: String,
+) -> Result<KubeObject, ErrResponse> {
+    let etcd_res = get(app_state, uri).await?;
+    let object_str = get_value_str(etcd_res)?;
+    let object: KubeObject = serde_json::from_str(object_str.as_str())
         .map_err(|err| ErrResponse::new("failed to deserialize".into(), Some(err.to_string())))?;
-    Ok(pod)
-}
-
-pub async fn put_pod_to_etcd(
-    app_state: &Arc<AppState>,
-    pod_name: String,
-    pod: Pod,
-) -> Result<(), ErrResponse> {
-    let pod_uri = format!("/api/v1/pods/{}", pod_name);
-    etcd_put(app_state, pod_uri, pod).await?;
-    Ok(())
+    Ok(object)
 }
 
 pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {
@@ -72,30 +64,9 @@ pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {
     }
 }
 
-pub fn update_pod_phase(pod: &mut Pod, new_phase: PodPhase) {
-    if let Some(ref mut status) = pod.status {
-        status.phase = new_phase;
-    } else {
-        let new_status: PodStatus = PodStatus {
-            phase: new_phase,
-            ..PodStatus::default()
-        };
-        pod.status = Some(new_status);
-    }
-}
-
-pub fn update_pod_condition(
-    pod: &mut Pod,
-    new_condition_type: PodConditionType,
-    new_condition: PodCondition,
-) {
-    if let Some(ref mut status) = pod.status {
-        status.conditions.insert(new_condition_type, new_condition);
-    } else {
-        let mut new_status: PodStatus = PodStatus::default();
-        new_status
-            .conditions
-            .insert(new_condition_type, new_condition);
-        pod.status = Some(new_status);
+pub fn get_pod_status(pod: &Pod) -> PodStatus {
+    match &pod.status {
+        Some(status) => status.clone(),
+        None => PodStatus::default(),
     }
 }

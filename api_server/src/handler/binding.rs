@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use axum::{extract::Path, http::Uri, Extension, Json};
+use axum::{extract::Path, Extension, Json};
 use axum_macros::debug_handler;
 use resources::objects::{
     pod::{PodCondition, PodConditionType},
-    KubeObject,
+    KubeObject, KubeResource,
 };
 
 use super::{
     response::{ErrResponse, HandlerResult, Response},
-    utils::*,
+    utils::{self, *},
 };
 use crate::AppState;
 
@@ -19,27 +19,52 @@ pub async fn bind(
     Extension(app_state): Extension<Arc<AppState>>,
     Path(pod_name): Path<String>,
     Json(payload): Json<KubeObject>,
-    uri: Uri,
 ) -> HandlerResult<()> {
+    // check payload
     if payload.kind() != "binding" {
-        let res = ErrResponse::new("object type error".to_string(), None);
+        let res = ErrResponse::new(
+            "bind error".to_string(),
+            Some(format!(
+                "the kind of payload: {}, which is not binding",
+                payload.kind()
+            )),
+        );
         return Err(res);
     }
-    // uri: /api/v1/bindings/:pod_name
-    // get pod
-    let mut pod = get_pod_from_etcd(&app_state, pod_name.clone()).await?;
+    // get pod object
+    let mut object: KubeObject =
+        get_object_from_etcd(&app_state, format!("/api/v1/pods/{}", pod_name)).await?;
     // update pod
-    update_pod_condition(
-        &mut pod,
-        PodConditionType::PodScheduled,
-        PodCondition {
-            status: true,
-        },
-    );
+    // Because we have only one type in KubeResource now,
+    // there will be a warning temporarily.
+    #[allow(irrefutable_let_patterns)]
+    if let KubeResource::Pod(ref mut pod) = object.resource {
+        let mut status = get_pod_status(pod);
+        status.conditions.insert(
+            PodConditionType::PodScheduled,
+            PodCondition {
+                status: true,
+            },
+        );
+        pod.status = Some(status);
+    } else {
+        tracing::error!("object kind error");
+        return Err(ErrResponse::new(
+            String::from("bind error"),
+            Some(format!(
+                "the kind of object: {}, which is not pod",
+                object.kind()
+            )),
+        ));
+    }
     // put it back
-    put_pod_to_etcd(&app_state, pod_name, pod).await?;
-    // TODO: check whether payload is a Binding KubeObject
-    etcd_put(&app_state, uri.to_string(), payload.clone()).await?;
+    utils::put(&app_state, format!("/api/v1/pods/{}", pod_name), object).await?;
+    utils::put(
+        &app_state,
+        format!("/api/v1/bindings/{}", pod_name),
+        payload.clone(),
+    )
+    .await?;
     let res = Response::new("bind successfully".to_string(), None);
     Ok(Json(res))
 }
