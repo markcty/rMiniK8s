@@ -33,7 +33,7 @@ pub async fn bind(
     }
     // get pod object
     let mut object: KubeObject =
-        get_object_from_etcd(&app_state, format!("/api/v1/pods/{}", pod_name)).await?;
+        get_object_from_etcd(&app_state, format!("/api/v1/pods/{}", pod_name), None).await?;
     // update pod
     // Because we have only one type in KubeResource now,
     // there will be a warning temporarily.

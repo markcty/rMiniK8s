@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use deadpool::managed;
-use etcd_client::{Client, GetOptions, GetResponse, KeyValue, PutOptions};
+use etcd_client::{Client, DeleteOptions, GetOptions, GetResponse, KeyValue, PutOptions};
 use serde::{Deserialize, Serialize};
 
 pub type EtcdPool = managed::Pool<EtcdManager>;
@@ -91,6 +91,19 @@ pub async fn get(
         .map_err(|err| EtcdError::new("Failed to get".into(), Some(err.to_string())))?;
     tracing::debug!("Successfully get");
     Ok(res)
+}
+
+pub async fn delete(
+    client: &mut EtcdClient,
+    key: String,
+    option: Option<DeleteOptions>,
+) -> Result<()> {
+    let _ = client
+        .delete(key, option)
+        .await
+        .map_err(|err| EtcdError::new("Failed to delete".into(), Some(err.to_string())));
+    tracing::debug!("Successfully delete");
+    Ok(())
 }
 
 pub fn kv_to_str(kv: &KeyValue) -> Result<(String, String)> {

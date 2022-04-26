@@ -33,6 +33,14 @@ pub async fn get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, 
     Ok(res)
 }
 
+pub async fn delete(app_state: &Arc<AppState>, key: String) -> Result<(), ErrResponse> {
+    let mut client = app_state.get_client().await?;
+    etcd::delete(&mut client, key, None)
+        .await
+        .map_err(ErrResponse::from)?;
+    Ok(())
+}
+
 pub async fn get_prefix(
     app_state: &Arc<AppState>,
     prefix: String,
@@ -47,11 +55,17 @@ pub async fn get_prefix(
 pub async fn get_object_from_etcd(
     app_state: &Arc<AppState>,
     uri: String,
+    kind: Option<&str>,
 ) -> Result<KubeObject, ErrResponse> {
     let etcd_res = get(app_state, uri).await?;
     let object_str = get_value_str(etcd_res)?;
     let object: KubeObject = serde_json::from_str(object_str.as_str())
         .map_err(|err| ErrResponse::new("failed to deserialize".into(), Some(err.to_string())))?;
+    if let Some(kind) = kind {
+        if object.kind() != kind {
+            return Err(ErrResponse::new("get object type error".to_string(), None));
+        }
+    }
     Ok(object)
 }
 
