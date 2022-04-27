@@ -58,11 +58,11 @@ pub async fn bind(
         ));
     }
     // put it back
-    etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), object).await?;
+    etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &object).await?;
     etcd_put(
         &app_state,
         format!("/api/v1/bindings/{}", pod_name),
-        payload.clone(),
+        &payload,
     )
     .await?;
     let res = Response::new(Some("bind successfully".to_string()), None);

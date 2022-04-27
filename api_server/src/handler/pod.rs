@@ -24,12 +24,7 @@ pub async fn apply(
         let mut status = pod.status.clone().unwrap_or_default();
         status.phase = PodPhase::Pending;
         pod.status = Some(status);
-        etcd_put(
-            &app_state,
-            format!("/api/v1/pods/{}", pod_name),
-            payload.clone(),
-        )
-        .await?;
+        etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &payload).await?;
         let res = Response::new(Some(format!("pod/{} created", pod_name)), None);
         let queue = &mut app_state.schedule_queue.write().unwrap();
         queue.push(payload);
@@ -68,12 +63,7 @@ pub async fn replace(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     if payload.kind() == "pod" {
-        etcd_put(
-            &app_state,
-            format!("/api/v1/pods/{}", pod_name),
-            payload.clone(),
-        )
-        .await?;
+        etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &payload).await?;
         let res = Response::new(Some(format!("pod/{} replaced", pod_name)), None);
         Ok(Json(res))
     } else {
