@@ -2,22 +2,21 @@ use std::sync::Arc;
 
 use axum::{Extension, Json};
 use axum_macros::debug_handler;
+use resources::objects::KubeObject;
 
 use super::{
     response::{HandlerResult, Response},
     utils::etcd_get_objects_by_prefix,
 };
-use crate::{etcd::kv_to_str, AppState};
+use crate::AppState;
 
 #[debug_handler]
-pub async fn list(Extension(app_state): Extension<Arc<AppState>>) -> HandlerResult<Vec<String>> {
-    let etcd_res = etcd_get_objects_by_prefix(&app_state, "/api/v1/nodes".to_string()).await?;
-    // TODO: deserialize the value to Node KubeObjects
-    let mut nodes: Vec<String> = Vec::new();
-    for kv in etcd_res.kvs() {
-        let (_, val_str) = kv_to_str(kv)?;
-        nodes.push(val_str.to_string());
-    }
+pub async fn list(
+    Extension(app_state): Extension<Arc<AppState>>,
+) -> HandlerResult<Vec<KubeObject>> {
+    let nodes =
+        etcd_get_objects_by_prefix(&app_state, "/api/v1/nodes".to_string(), Some("node")).await?;
+
     let res = Response::new(None, Some(nodes));
     Ok(Json(res))
 }

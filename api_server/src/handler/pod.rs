@@ -8,7 +8,7 @@ use super::{
     response::{ErrResponse, HandlerResult, Response},
     utils::*,
 };
-use crate::{etcd::kv_to_str, AppState};
+use crate::AppState;
 
 #[debug_handler]
 pub async fn apply(
@@ -101,23 +101,9 @@ pub async fn delete(
 pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> HandlerResult<Vec<KubeObject>> {
-    // uri: /api/v1/pods
-    let etcd_res = etcd_get_objects_by_prefix(&app_state, "/api/v1/pods".to_string()).await?;
-    let mut pods: Vec<KubeObject> = Vec::new();
-    let mut msg = "get pods successfully".to_string();
-    for kv in etcd_res.kvs() {
-        let (_, val_str) = kv_to_str(kv)?;
-        let pod: KubeObject = serde_json::from_str(val_str.as_str()).map_err(|err| {
-            ErrResponse::new("failed to deserialize".into(), Some(err.to_string()))
-        })?;
-        if pod.kind() == "pod" {
-            pods.push(pod);
-        } else {
-            // only report the error, then continue to process other objects
-            tracing::error!("There are some errors with the kind of objects");
-            msg = "There are some errors with the kind of objects".to_string();
-        }
-    }
-    let res = Response::new(Some(msg), Some(pods));
+    let pods =
+        etcd_get_objects_by_prefix(&app_state, "/api/v1/pods".to_string(), Some("pod")).await?;
+
+    let res = Response::new(None, Some(pods));
     Ok(Json(res))
 }

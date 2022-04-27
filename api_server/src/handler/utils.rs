@@ -41,12 +41,33 @@ pub async fn etcd_delete(app_state: &Arc<AppState>, key: String) -> Result<(), E
 pub async fn etcd_get_objects_by_prefix(
     app_state: &Arc<AppState>,
     prefix: String,
-) -> Result<GetResponse, ErrResponse> {
+    kind: Option<&str>,
+) -> Result<Vec<KubeObject>, ErrResponse> {
     let mut client = app_state.get_client().await?;
     let res = etcd::get(&mut client, prefix, Some(GetOptions::new().with_prefix()))
         .await
         .map_err(ErrResponse::from)?;
-    Ok(res)
+
+    let mut objects: Vec<KubeObject> = Vec::new();
+    for kv in res.kvs() {
+        let (_, val_str) = kv_to_str(kv)?;
+        let object: KubeObject = serde_json::from_str(val_str.as_str()).map_err(|err| {
+            ErrResponse::new("failed to deserialize".into(), Some(err.to_string()))
+        })?;
+
+        if let Some(kind) = kind {
+            if object.kind() == kind {
+                objects.push(object);
+            } else {
+                tracing::error!("There are some errors with the kind of objects");
+                return Err(ErrResponse::new(
+                    "There are some errors with the kind of objects".to_string(),
+                    Some(format!("expected: {}, found: {}", kind, object.kind())),
+                ));
+            }
+        }
+    }
+    Ok(objects)
 }
 
 pub async fn etcd_get_object(
