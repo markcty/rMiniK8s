@@ -30,7 +30,7 @@ pub async fn apply(
             payload.clone(),
         )
         .await?;
-        let res = Response::new(format!("pod/{} created", pod_name), None);
+        let res = Response::new(Some(format!("pod/{} created", pod_name)), None);
         let queue = &mut app_state.schedule_queue.write().unwrap();
         queue.push(payload);
         Ok(Json(res))
@@ -57,7 +57,7 @@ pub async fn get(
         Some("pod"),
     )
     .await?;
-    let res = Response::new(format!("pod/{} readed", pod_name), Some(pod_object));
+    let res = Response::new(None, Some(pod_object));
     Ok(Json(res))
 }
 
@@ -74,7 +74,7 @@ pub async fn replace(
             payload.clone(),
         )
         .await?;
-        let res = Response::new(format!("pod/{} replaced", pod_name), None);
+        let res = Response::new(Some(format!("pod/{} replaced", pod_name)), None);
         Ok(Json(res))
     } else {
         Err(ErrResponse::new(
@@ -93,7 +93,7 @@ pub async fn delete(
     Path(pod_name): Path<String>,
 ) -> HandlerResult<()> {
     etcd_delete(&app_state, format!("/api/v1/pods/{}", pod_name)).await?;
-    let res = Response::new(format!("pod/{} deleted", pod_name), None);
+    let res = Response::new(Some(format!("pod/{} deleted", pod_name)), None);
     Ok(Json(res))
 }
 
@@ -118,6 +118,6 @@ pub async fn list(
             msg = "There are some errors with the kind of objects".to_string();
         }
     }
-    let res = Response::new(msg, Some(pods));
+    let res = Response::new(Some(msg), Some(pods));
     Ok(Json(res))
 }

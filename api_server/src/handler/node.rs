@@ -18,6 +18,6 @@ pub async fn list(Extension(app_state): Extension<Arc<AppState>>) -> HandlerResu
         let (_, val_str) = kv_to_str(kv)?;
         nodes.push(val_str.to_string());
     }
-    let res = Response::new("get nodes successfully".to_string(), Some(nodes));
+    let res = Response::new(None, Some(nodes));
     Ok(Json(res))
 }

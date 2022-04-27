@@ -5,7 +5,7 @@ use crate::etcd::EtcdError;
 
 #[derive(Debug, Serialize)]
 pub struct Response<T: Serialize> {
-    pub msg: String,
+    pub msg: Option<String>,
     pub data: Option<T>,
 }
 
@@ -21,7 +21,7 @@ impl<T> Response<T>
 where
     T: Serialize,
 {
-    pub fn new(msg: String, data: Option<T>) -> Self {
+    pub fn new(msg: Option<String>, data: Option<T>) -> Self {
         Self {
             msg,
             data,

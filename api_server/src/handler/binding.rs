@@ -65,6 +65,6 @@ pub async fn bind(
         payload.clone(),
     )
     .await?;
-    let res = Response::new("bind successfully".to_string(), None);
+    let res = Response::new(Some("bind successfully".to_string()), None);
     Ok(Json(res))
 }
