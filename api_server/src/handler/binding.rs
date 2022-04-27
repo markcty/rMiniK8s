@@ -9,7 +9,7 @@ use resources::objects::{
 
 use super::{
     response::{ErrResponse, HandlerResult, Response},
-    utils::{self, *},
+    utils::*,
 };
 use crate::AppState;
 
@@ -33,13 +33,13 @@ pub async fn bind(
     }
     // get pod object
     let mut object: KubeObject =
-        get_object_from_etcd(&app_state, format!("/api/v1/pods/{}", pod_name), None).await?;
+        etcd_get_object(&app_state, format!("/api/v1/pods/{}", pod_name), None).await?;
     // update pod
     // Because we have only one type in KubeResource now,
     // there will be a warning temporarily.
     #[allow(irrefutable_let_patterns)]
     if let KubeResource::Pod(ref mut pod) = object.resource {
-        let mut status = get_pod_status(pod);
+        let mut status = pod.status.clone().unwrap_or_default();
         status.conditions.insert(
             PodConditionType::PodScheduled,
             PodCondition {
@@ -58,8 +58,8 @@ pub async fn bind(
         ));
     }
     // put it back
-    utils::put(&app_state, format!("/api/v1/pods/{}", pod_name), object).await?;
-    utils::put(
+    etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), object).await?;
+    etcd_put(
         &app_state,
         format!("/api/v1/bindings/{}", pod_name),
         payload.clone(),

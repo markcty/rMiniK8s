@@ -6,7 +6,7 @@ use resources::objects::{pod::PodPhase, KubeObject, KubeResource};
 
 use super::{
     response::{ErrResponse, HandlerResult, Response},
-    utils::{self, *},
+    utils::*,
 };
 use crate::{etcd::kv_to_str, AppState};
 
@@ -21,10 +21,10 @@ pub async fn apply(
     // there will be a warning temporarily.
     #[allow(irrefutable_let_patterns)]
     if let KubeResource::Pod(ref mut pod) = payload.resource {
-        let mut status = get_pod_status(pod);
+        let mut status = pod.status.clone().unwrap_or_default();
         status.phase = PodPhase::Pending;
         pod.status = Some(status);
-        utils::put(
+        etcd_put(
             &app_state,
             format!("/api/v1/pods/{}", pod_name),
             payload.clone(),
@@ -47,11 +47,11 @@ pub async fn apply(
 }
 
 #[debug_handler]
-pub async fn read(
+pub async fn get(
     Extension(app_state): Extension<Arc<AppState>>,
     Path(pod_name): Path<String>,
 ) -> HandlerResult<KubeObject> {
-    let pod_object = get_object_from_etcd(
+    let pod_object = etcd_get_object(
         &app_state,
         format!("/api/v1/pods/{}", pod_name),
         Some("pod"),
@@ -68,7 +68,7 @@ pub async fn replace(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     if payload.kind() == "pod" {
-        utils::put(
+        etcd_put(
             &app_state,
             format!("/api/v1/pods/{}", pod_name),
             payload.clone(),
@@ -92,7 +92,7 @@ pub async fn delete(
     Extension(app_state): Extension<Arc<AppState>>,
     Path(pod_name): Path<String>,
 ) -> HandlerResult<()> {
-    utils::delete(&app_state, format!("/api/v1/pods/{}", pod_name)).await?;
+    etcd_delete(&app_state, format!("/api/v1/pods/{}", pod_name)).await?;
     let res = Response::new(format!("pod/{} deleted", pod_name), None);
     Ok(Json(res))
 }
@@ -102,7 +102,7 @@ pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> HandlerResult<Vec<KubeObject>> {
     // uri: /api/v1/pods
-    let etcd_res = utils::get_prefix(&app_state, "/api/v1/pods".to_string()).await?;
+    let etcd_res = etcd_get_objects_by_prefix(&app_state, "/api/v1/pods".to_string()).await?;
     let mut pods: Vec<KubeObject> = Vec::new();
     let mut msg = "get pods successfully".to_string();
     for kv in etcd_res.kvs() {

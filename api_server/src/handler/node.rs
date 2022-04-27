@@ -5,13 +5,13 @@ use axum_macros::debug_handler;
 
 use super::{
     response::{HandlerResult, Response},
-    utils,
+    utils::etcd_get_objects_by_prefix,
 };
 use crate::{etcd::kv_to_str, AppState};
 
 #[debug_handler]
 pub async fn list(Extension(app_state): Extension<Arc<AppState>>) -> HandlerResult<Vec<String>> {
-    let etcd_res = utils::get_prefix(&app_state, "/api/v1/nodes".to_string()).await?;
+    let etcd_res = etcd_get_objects_by_prefix(&app_state, "/api/v1/nodes".to_string()).await?;
     // TODO: deserialize the value to Node KubeObjects
     let mut nodes: Vec<String> = Vec::new();
     for kv in etcd_res.kvs() {

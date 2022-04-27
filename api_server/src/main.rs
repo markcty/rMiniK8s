@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/api/v1/pods/:name", post(handler::pod::apply))
-        .route("/api/v1/pods/:name", get(handler::pod::read))
+        .route("/api/v1/pods/:name", get(handler::pod::get))
         .route("/api/v1/pods/:name", put(handler::pod::replace))
         .route("/api/v1/pods/:name", delete(handler::pod::delete))
         .route("/api/v1/pods", get(handler::pod::list))

@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use etcd_client::{GetOptions, GetResponse};
-use resources::objects::{
-    pod::{Pod, PodStatus},
-    KubeObject,
-};
+use resources::objects::KubeObject;
 use serde::Serialize;
 
 use super::response::ErrResponse;
@@ -13,7 +10,7 @@ use crate::{
     AppState,
 };
 
-pub async fn put(
+pub async fn etcd_put(
     app_state: &Arc<AppState>,
     key: String,
     val: impl Serialize,
@@ -25,7 +22,7 @@ pub async fn put(
     Ok(())
 }
 
-pub async fn get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, ErrResponse> {
+pub async fn etcd_get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, ErrResponse> {
     let mut client = app_state.get_client().await?;
     let res = etcd::get(&mut client, key, None)
         .await
@@ -33,7 +30,7 @@ pub async fn get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, 
     Ok(res)
 }
 
-pub async fn delete(app_state: &Arc<AppState>, key: String) -> Result<(), ErrResponse> {
+pub async fn etcd_delete(app_state: &Arc<AppState>, key: String) -> Result<(), ErrResponse> {
     let mut client = app_state.get_client().await?;
     etcd::delete(&mut client, key, None)
         .await
@@ -41,7 +38,7 @@ pub async fn delete(app_state: &Arc<AppState>, key: String) -> Result<(), ErrRes
     Ok(())
 }
 
-pub async fn get_prefix(
+pub async fn etcd_get_objects_by_prefix(
     app_state: &Arc<AppState>,
     prefix: String,
 ) -> Result<GetResponse, ErrResponse> {
@@ -52,12 +49,12 @@ pub async fn get_prefix(
     Ok(res)
 }
 
-pub async fn get_object_from_etcd(
+pub async fn etcd_get_object(
     app_state: &Arc<AppState>,
     uri: String,
     kind: Option<&str>,
 ) -> Result<KubeObject, ErrResponse> {
-    let etcd_res = get(app_state, uri).await?;
+    let etcd_res = etcd_get(app_state, uri).await?;
     let object_str = get_value_str(etcd_res)?;
     let object: KubeObject = serde_json::from_str(object_str.as_str())
         .map_err(|err| ErrResponse::new("failed to deserialize".into(), Some(err.to_string())))?;
@@ -75,12 +72,5 @@ pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {
         Ok(val_str)
     } else {
         Err(ErrResponse::new("value didn't exist".to_string(), None))
-    }
-}
-
-pub fn get_pod_status(pod: &Pod) -> PodStatus {
-    match &pod.status {
-        Some(status) => status.clone(),
-        None => PodStatus::default(),
     }
 }
