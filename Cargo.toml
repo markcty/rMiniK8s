@@ -4,4 +4,5 @@ members = [
     "api_server",
     "rkubelet",
     "resources",
+    "controllers",
 ]

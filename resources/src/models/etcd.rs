@@ -6,13 +6,18 @@ use crate::objects::KubeObject;
 #[serde(tag = "type")]
 pub enum WatchEvent {
     Put(PutEvent),
-    Delete,
+    Delete(DeleteEvent),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PutEvent {
     pub key: String,
     pub object: KubeObject,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeleteEvent {
+    pub key: String,
 }
 
 impl WatchEvent {
@@ -24,6 +29,8 @@ impl WatchEvent {
     }
 
     pub fn new_delete(key: String) -> Self {
-        WatchEvent::Delete
+        WatchEvent::Delete(DeleteEvent {
+            key,
+        })
     }
 }

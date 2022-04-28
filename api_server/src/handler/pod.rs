@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, WebSocketUpgrade},
-    http::Uri,
     response::IntoResponse,
     Extension, Json,
 };
@@ -14,6 +13,7 @@ use super::{
     response::{ErrResponse, HandlerResult, Response},
     utils::*,
 };
+use crate::{etcd::forward_watch_to_ws, AppState};
 
 #[debug_handler]
 pub async fn apply(
@@ -100,6 +100,7 @@ pub async fn list(
         etcd_get_objects_by_prefix(&app_state, "/api/v1/pods".to_string(), Some("pod")).await?;
 
     let res = Response::new(None, Some(pods));
+    tracing::debug!("List succeeded");
     Ok(Json(res))
 }
 

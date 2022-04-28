@@ -126,7 +126,7 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
                         }
                     },
                 };
-                sender.send(msg).await?
+                sender.send(msg).await?;
             }
         }
         Ok(())
@@ -153,7 +153,7 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
             if let Err(e) = res {
                 tracing::error!("Etcd watch {} exit unexpectedly, caused by: {}", watch_id, e.to_string());
             } else {
-                tracing::info!("Etcd watch {} disconnect by client", watch_id);
+                tracing::info!("Etcd watch {} disconnected by client", watch_id);
             }
         },
     }
