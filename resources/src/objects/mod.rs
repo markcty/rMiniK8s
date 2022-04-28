@@ -38,4 +38,7 @@ impl KubeObject {
     pub fn kind(&self) -> String {
         self.resource.to_string().to_lowercase()
     }
+    pub fn name(&self) -> String {
+        self.metadata.name.to_owned()
+    }
 }

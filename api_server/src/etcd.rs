@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use async_trait::async_trait;
 use axum::extract::ws::{Message, WebSocket};
 use deadpool::managed;
@@ -101,9 +102,11 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
             }
 
             for event in res.events() {
+                let kv = event.kv().ok_or_else(|| anyhow!("Failed to get etcd kv"))?;
                 let msg = match event.event_type() {
                     EventType::Delete => {
-                        let event = WatchEvent::new_delete();
+                        let key = kv.key_str()?.to_string();
+                        let event = WatchEvent::new_delete(key);
                         Message::Text(serde_json::to_string(&event)?)
                     },
                     EventType::Put => {
@@ -111,7 +114,7 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
                             let key = kv.key_str()?.to_string();
                             let value = kv.value_str()?.to_string();
 
-                            let event = WatchEvent::new_put(key, value);
+                            let event = WatchEvent::new_put(key, serde_json::from_str(&value)?);
                             Message::Text(serde_json::to_string(&event)?)
                         } else {
                             continue;
@@ -136,9 +139,9 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
     }
 
     tokio::select! {
-        res = ws_send(sender,watcher,stream) => {
+        res = ws_send(sender, watcher, stream) => {
             if let Err(e) = res {
-                tracing::error!("Etcd watch {} exit unexpectedly, caused by: {}", watch_id,e.to_string());
+                tracing::error!("Etcd watch {} exit unexpectedly, caused by: {}", watch_id, e.to_string());
             }
         },
         res = ws_receive(receiver) => {
