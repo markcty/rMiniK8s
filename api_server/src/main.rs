@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use anyhow::{Context, Result};
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Extension, Router,
 };
 use config::Config;
@@ -42,10 +42,13 @@ async fn main() -> Result<()> {
     let shared_state = Arc::new(app_state);
 
     let app = Router::new()
-        .route("/api/v1/pods/:name", post(handler::pod::apply))
-        .route("/api/v1/pods/:name", get(handler::pod::get))
-        .route("/api/v1/pods/:name", put(handler::pod::replace))
-        .route("/api/v1/pods/:name", delete(handler::pod::delete))
+        .route(
+            "/api/v1/pods/:name",
+            post(handler::pod::create)
+                .get(handler::pod::get)
+                .put(handler::pod::replace)
+                .delete(handler::pod::delete),
+        )
         .route("/api/v1/pods", get(handler::pod::list))
         .route("/api/v1/nodes", get(handler::node::list))
         .route("/api/v1/bindings/:name", post(handler::binding::bind))
