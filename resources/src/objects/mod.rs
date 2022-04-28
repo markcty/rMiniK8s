@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use strum::Display;
 use uuid::Uuid;
 
+pub mod binding;
+pub mod object_reference;
 pub mod pod;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,6 +17,7 @@ pub struct KubeObject {
 #[serde(tag = "kind")]
 pub enum KubeResource {
     Pod(pod::Pod),
+    // Binding(binding::Binding),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

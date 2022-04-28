@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use axum::extract::ws::{Message, WebSocket};
 use deadpool::managed;
-use etcd_client::{Client, *};
+use etcd_client::*;
 use futures::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -70,12 +70,17 @@ impl EtcdError {
 // all etcd error should be encapsulated into EtcdError
 type Result<T> = core::result::Result<T, EtcdError>;
 
-pub async fn put(client: &mut EtcdClient, key: String, value: impl Serialize) -> Result<()> {
+pub async fn put(
+    client: &mut EtcdClient,
+    key: String,
+    value: impl Serialize,
+    option: Option<PutOptions>,
+) -> Result<()> {
     let value = serde_json::to_string(&value)
         .map_err(|err| EtcdError::new("Failed to serialize".into(), Some(err.to_string())))?;
 
     let _ = client
-        .put(key, value, None)
+        .put(key, value, option)
         .await
         .map_err(|err| EtcdError::new("Failed to put".into(), Some(err.to_string())))?;
     tracing::debug!("Successfully put");
@@ -152,4 +157,48 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
             }
         },
     }
+}
+
+pub async fn get(
+    client: &mut EtcdClient,
+    key: String,
+    option: Option<GetOptions>,
+) -> Result<GetResponse> {
+    let res = client
+        .get(key, option)
+        .await
+        .map_err(|err| EtcdError::new("Failed to get".into(), Some(err.to_string())))?;
+    tracing::debug!("Successfully get");
+    Ok(res)
+}
+
+pub async fn delete(
+    client: &mut EtcdClient,
+    key: String,
+    option: Option<DeleteOptions>,
+) -> Result<()> {
+    let _ = client
+        .delete(key, option)
+        .await
+        .map_err(|err| EtcdError::new("Failed to delete".into(), Some(err.to_string())));
+    tracing::debug!("Successfully delete");
+    Ok(())
+}
+
+pub fn kv_to_str(kv: &KeyValue) -> Result<(String, String)> {
+    let (key_str, val_str) = (
+        kv.key_str().map_err(|err| {
+            EtcdError::new(
+                "Failed to convert key to String".into(),
+                Some(err.to_string()),
+            )
+        })?,
+        kv.value_str().map_err(|err| {
+            EtcdError::new(
+                "Failed to convert value to String".into(),
+                Some(err.to_string()),
+            )
+        })?,
+    );
+    Ok((key_str.to_string(), val_str.to_string()))
 }
