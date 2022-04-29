@@ -7,7 +7,7 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use etcd_client::*;
-use resources::objects::{pod::PodPhase, KubeObject, KubeResource};
+use resources::objects::{pod::PodPhase, KubeObject, KubeResource, Object};
 
 use super::{
     response::{ErrResponse, HandlerResult, Response},
@@ -95,12 +95,15 @@ pub async fn delete(
 #[debug_handler]
 pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
-) -> HandlerResult<Vec<KubeObject>> {
+) -> HandlerResult<Vec<(String, String)>> {
     let pods =
         etcd_get_objects_by_prefix(&app_state, "/api/v1/pods".to_string(), Some("pod")).await?;
 
-    let res = Response::new(None, Some(pods));
-    tracing::debug!("List succeeded");
+    let res = pods
+        .iter()
+        .map(|o| (o.uri(), serde_json::to_string(o).unwrap()))
+        .collect::<Vec<(String, String)>>();
+    let res = Response::new(None, Some(res));
     Ok(Json(res))
 }
 

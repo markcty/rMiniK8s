@@ -119,7 +119,7 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
                             let key = kv.key_str()?.to_string();
                             let value = kv.value_str()?.to_string();
 
-                            let event = WatchEvent::new_put(key, serde_json::from_str(&value)?);
+                            let event = WatchEvent::new_put(key, value);
                             Message::Text(serde_json::to_string(&event)?)
                         } else {
                             continue;

@@ -45,3 +45,13 @@ impl KubeObject {
         self.metadata.name.to_owned()
     }
 }
+
+pub trait Object {
+    fn uri(&self) -> String;
+}
+
+impl Object for KubeObject {
+    fn uri(&self) -> String {
+        format!("/api/v1/{}s/{}", self.kind(), self.name())
+    }
+}

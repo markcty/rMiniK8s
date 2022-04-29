@@ -1,43 +1,32 @@
-use std::sync::Arc;
-
 use anyhow::{anyhow, Result};
 use futures_util::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
 use super::{ListerWatcher, Store};
-use crate::{models::etcd::WatchEvent, objects::KubeObject};
+use crate::models::etcd::WatchEvent;
 
 pub(super) struct Reflector {
     pub(super) lw: ListerWatcher,
-    // tx: Sender<ReflectorNotification>,
-    pub(super) store: Arc<Store>,
+    pub(super) store: Store,
 }
 
 #[derive(Debug)]
-pub(super) struct ReflectorNotification {
-    pub(super) key: String,
-    pub(super) op: ReflectorNotificationOp,
-}
-
-#[derive(Debug)]
-pub(super) enum ReflectorNotificationOp {
-    Add(KubeObject),
+pub(super) enum ReflectorNotification {
+    Add(String),
     /// old value, new value
-    Update(KubeObject, KubeObject),
-    Delete(KubeObject),
+    Update(String, String),
+    Delete(String),
 }
 
 impl Reflector {
     pub(super) async fn run(&self, tx: mpsc::Sender<ReflectorNotification>) -> Result<()> {
         // pull the init changes
-        let objects: Vec<KubeObject> = (self.lw.lister)().await?;
-        for object in objects {
-            self.store
-                // TODO: replace it with gen uri
-                .insert(format!("/api/v1/pods/{}", object.name()), object.clone());
+        let kvs: Vec<(String, String)> = (self.lw.lister)(()).await?;
+        for (k, v) in kvs {
+            self.store.insert(k, v);
         }
-        let (_, mut receiver) = (self.lw.watcher)().await?.split();
+        let (_, mut receiver) = (self.lw.watcher)(()).await?.split();
 
         loop {
             let msg: Message = receiver
@@ -58,27 +47,16 @@ impl Reflector {
                             drop(object);
 
                             self.store.insert(e.key.to_owned(), e.object.clone());
-                            tx.send(ReflectorNotification {
-                                key: e.key,
-                                op: ReflectorNotificationOp::Update(old, e.object),
-                            })
-                            .await?;
+                            tx.send(ReflectorNotification::Update(old, e.object))
+                                .await?;
                         } else {
                             self.store.insert(e.key.to_owned(), e.object.clone());
-                            tx.send(ReflectorNotification {
-                                key: e.key,
-                                op: ReflectorNotificationOp::Add(e.object),
-                            })
-                            .await?;
+                            tx.send(ReflectorNotification::Add(e.object)).await?;
                         }
                     },
                     WatchEvent::Delete(e) => {
                         if let Some(old) = self.store.remove(&e.key) {
-                            tx.send(ReflectorNotification {
-                                key: e.key,
-                                op: ReflectorNotificationOp::Delete(old.1),
-                            })
-                            .await?;
+                            tx.send(ReflectorNotification::Delete(old.1)).await?;
                         } else {
                             tracing::warn!("Watch inconsistent, key {} already deleted", e.key);
                         }

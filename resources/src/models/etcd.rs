@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::objects::KubeObject;
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum WatchEvent {
@@ -12,7 +10,7 @@ pub enum WatchEvent {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PutEvent {
     pub key: String,
-    pub object: KubeObject,
+    pub object: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -21,7 +19,7 @@ pub struct DeleteEvent {
 }
 
 impl WatchEvent {
-    pub fn new_put(key: String, object: KubeObject) -> Self {
+    pub fn new_put(key: String, object: String) -> Self {
         WatchEvent::Put(PutEvent {
             key,
             object,
