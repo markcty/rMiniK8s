@@ -1,5 +1,6 @@
 use std::{cmp::Eq, default::Default, hash::Hash};
 
+use anyhow::{Context, Result};
 use bollard::{
     container::{Config, CreateContainerOptions, StartContainerOptions},
     image::CreateImageOptions,
@@ -60,10 +61,7 @@ impl Container {
         &self.id
     }
 
-    pub async fn create<T, Z>(
-        name: Option<T>,
-        config: Config<Z>,
-    ) -> Result<Self, bollard::errors::Error>
+    pub async fn create<T, Z>(name: Option<T>, config: Config<Z>) -> Result<Self>
     where
         T: Into<String> + Serialize,
         Z: Into<String> + Hash + Eq + Serialize,
@@ -82,18 +80,21 @@ impl Container {
                     id: response.id,
                 }
             })
+            .with_context(|| "Failed to create container".to_string())
     }
 
-    pub async fn start(&self) -> Result<(), bollard::errors::Error> {
+    pub async fn start(&self) -> Result<()> {
         DOCKER
             .start_container(self.id.as_str(), None::<StartContainerOptions<String>>)
             .await
+            .with_context(|| format!("Failed to start container {}", self.id))
     }
 
-    pub async fn inspect(
-        &self,
-    ) -> Result<bollard::models::ContainerInspectResponse, bollard::errors::Error> {
-        DOCKER.inspect_container(self.id.as_str(), None).await
+    pub async fn inspect(&self) -> Result<bollard::models::ContainerInspectResponse> {
+        DOCKER
+            .inspect_container(self.id.as_str(), None)
+            .await
+            .with_context(|| format!("Failed to inspect container {}", self.id))
     }
 }
 

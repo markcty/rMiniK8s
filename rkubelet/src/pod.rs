@@ -1,5 +1,6 @@
 use std::default::Default;
 
+use anyhow::{Context, Result};
 use bollard::{
     container::Config,
     models::{ContainerInspectResponse, HostConfig},
@@ -29,7 +30,7 @@ impl Pod {
     #[allow(dead_code)]
     pub fn load(object: KubeObject) -> Self {
         if let KubeResource::Pod(resource) = object.resource {
-            let status = resource.status.expect("Pod::load:: status is missing");
+            let status = resource.status.expect("[Pod::load] Status is missing");
             Pod {
                 metadata: object.metadata,
                 spec: resource.spec,
@@ -40,7 +41,7 @@ impl Pod {
         }
     }
 
-    pub async fn create(object: KubeObject) -> Result<Self, bollard::errors::Error> {
+    pub async fn create(object: KubeObject) -> Result<Self> {
         if let KubeResource::Pod(resource) = object.resource {
             tracing::info!("Creating pod containers...");
 
@@ -64,7 +65,7 @@ impl Pod {
     }
 
     #[allow(dead_code)]
-    pub async fn start(&self) -> Result<(), bollard::errors::Error> {
+    pub async fn start(&self) -> Result<()> {
         tracing::info!("Starting pod containers...");
         let containers = self
             .status
@@ -81,7 +82,7 @@ impl Pod {
         &self,
         container: &pod::Container,
         pause_container: &Container,
-    ) -> Result<Container, bollard::errors::Error> {
+    ) -> Result<Container> {
         let image = Image::create(&container.image).await;
         let mode = Some(format!("container:{}", pause_container.id()));
         // TODO: Handle volume mounts
@@ -103,10 +104,7 @@ impl Pod {
         Container::create(name, config).await
     }
 
-    async fn create_containers(
-        &self,
-        pause_container: &Container,
-    ) -> Result<Vec<Container>, bollard::errors::Error> {
+    async fn create_containers(&self, pause_container: &Container) -> Result<Vec<Container>> {
         let mut tasks = vec![];
         for container in &self.spec.containers {
             tasks.push(self.create_container(container, pause_container));
@@ -114,7 +112,7 @@ impl Pod {
         try_join_all(tasks).await
     }
 
-    async fn create_pause_container(&self) -> Result<Container, bollard::errors::Error> {
+    async fn create_pause_container(&self) -> Result<Container> {
         let image = Image::create(PAUSE_IMAGE_NAME).await;
         let host_config = Some(HostConfig {
             network_mode: Some(self.spec.network_mode()),
@@ -132,26 +130,26 @@ impl Pod {
         Ok(container)
     }
 
-    async fn start_containers(
-        &self,
-        containers: &[Container],
-    ) -> Result<Vec<()>, bollard::errors::Error> {
+    async fn start_containers(&self, containers: &[Container]) -> Result<()> {
         let mut tasks = vec![];
         for container in containers {
             tasks.push(container.start());
         }
-        try_join_all(tasks).await
+        try_join_all(tasks)
+            .await
+            .with_context(|| "Failed to start containers")
+            .map(|_| ())
     }
 
-    async fn inspect_containers(
-        &self,
-    ) -> Result<Vec<ContainerInspectResponse>, bollard::errors::Error> {
+    async fn inspect_containers(&self) -> Result<Vec<ContainerInspectResponse>> {
         let containers = self.containers();
         let tasks = containers.iter().map(|c| c.inspect()).collect::<Vec<_>>();
-        try_join_all(tasks).await
+        try_join_all(tasks)
+            .await
+            .with_context(|| "Failed to inspect containers")
     }
 
-    pub async fn update_status(&mut self) -> Result<(), bollard::errors::Error> {
+    pub async fn update_status(&mut self) -> Result<()> {
         let response = self.pause_container().inspect().await?;
         let pod_ip = Pod::get_ip(&response).map(|ip| ip.to_owned());
         // TODO: strip uid off container names

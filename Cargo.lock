@@ -1598,6 +1598,7 @@ dependencies = [
 name = "rkubelet"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bollard",
  "futures",
  "lazy_static",
