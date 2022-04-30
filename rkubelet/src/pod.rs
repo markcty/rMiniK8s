@@ -28,35 +28,39 @@ pub struct Pod {
 impl Pod {
     #[allow(dead_code)]
     pub fn load(object: KubeObject) -> Self {
-        // TODO: Change to `match` after adding more types
-        let KubeResource::Pod(resource) = object.resource;
-        let status = resource.status.expect("Pod::load:: status is missing");
-        Pod {
-            metadata: object.metadata,
-            spec: resource.spec,
-            status,
+        if let KubeResource::Pod(resource) = object.resource {
+            let status = resource.status.expect("Pod::load:: status is missing");
+            Pod {
+                metadata: object.metadata,
+                spec: resource.spec,
+                status,
+            }
+        } else {
+            panic!("Expecting Pod, received {:?}", object.resource);
         }
     }
 
     pub async fn create(object: KubeObject) -> Result<Self, bollard::errors::Error> {
-        // TODO: Change to `match` after adding more types
-        let KubeResource::Pod(resource) = object.resource;
-        tracing::info!("Creating pod containers...");
+        if let KubeResource::Pod(resource) = object.resource {
+            tracing::info!("Creating pod containers...");
 
-        let mut metadata = object.metadata;
-        let uid = Uuid::new_v4();
-        metadata.uid = Some(uid);
+            let mut metadata = object.metadata;
+            let uid = Uuid::new_v4();
+            metadata.uid = Some(uid);
 
-        let mut pod = Self {
-            metadata,
-            spec: resource.spec,
-            status: PodStatus::default(),
-        };
-        let pause_container = pod.create_pause_container().await?;
-        pod.create_containers(&pause_container).await?;
-        pod.update_status().await?;
+            let mut pod = Self {
+                metadata,
+                spec: resource.spec,
+                status: PodStatus::default(),
+            };
+            let pause_container = pod.create_pause_container().await?;
+            pod.create_containers(&pause_container).await?;
+            pod.update_status().await?;
 
-        Ok(pod)
+            Ok(pod)
+        } else {
+            panic!("Expecting Pod, received {:?}", object.resource);
+        }
     }
 
     #[allow(dead_code)]
@@ -80,7 +84,10 @@ impl Pod {
     ) -> Result<Container, bollard::errors::Error> {
         let image = Image::create(&container.image).await;
         let mode = Some(format!("container:{}", pause_container.id()));
+        // TODO: Handle volume mounts
         let host_config = Some(HostConfig {
+            cpu_shares: Some(container.resources.limits.cpu),
+            memory: Some(container.resources.limits.memory),
             network_mode: mode.to_owned(),
             ipc_mode: mode.to_owned(),
             pid_mode: mode.to_owned(),
@@ -88,6 +95,7 @@ impl Pod {
         });
         let config = Config {
             image: Some(image.name().to_owned()),
+            entrypoint: Some(container.command.to_owned()),
             host_config,
             ..Default::default()
         };
@@ -109,6 +117,7 @@ impl Pod {
     async fn create_pause_container(&self) -> Result<Container, bollard::errors::Error> {
         let image = Image::create(PAUSE_IMAGE_NAME).await;
         let host_config = Some(HostConfig {
+            network_mode: Some(self.spec.network_mode()),
             ipc_mode: Some("shareable".to_string()),
             ..Default::default()
         });

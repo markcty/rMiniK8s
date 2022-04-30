@@ -17,7 +17,7 @@ pub struct KubeObject {
 #[serde(tag = "kind")]
 pub enum KubeResource {
     Pod(pod::Pod),
-    // Binding(binding::Binding),
+    Binding(binding::Binding),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

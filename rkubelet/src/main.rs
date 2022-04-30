@@ -21,6 +21,7 @@ async fn main() {
                 ports: vec![ContainerPort {
                     container_port: 80,
                 }],
+                ..Default::default()
             },
             Container {
                 name: "redis".to_string(),
@@ -28,8 +29,10 @@ async fn main() {
                 ports: vec![ContainerPort {
                     container_port: 6379,
                 }],
+                ..Default::default()
             },
         ],
+        ..Default::default()
     };
     let object = KubeObject {
         metadata: Metadata {

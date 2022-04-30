@@ -11,15 +11,36 @@ pub struct Pod {
     pub status: Option<PodStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct PodSpec {
     /// List of containers belonging to the pod.
     /// Containers cannot currently be added or removed.
     /// There must be at least one container in a Pod. Cannot be updated.
     pub containers: Vec<Container>,
+    /// List of volumes that can be mounted by containers belonging to the pod.
+    #[serde(default)]
+    pub volumes: Vec<Volume>,
+    /// Host networking requested for this pod.
+    /// Use the host's network namespace.
+    /// If this option is set, the ports that will be used must be specified.
+    /// Default to false.
+    #[serde(default)]
+    pub host_network: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+impl PodSpec {
+    pub fn network_mode(&self) -> String {
+        if self.host_network {
+            "host".to_string()
+        } else {
+            "bridge".to_string()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Container {
     /// Name of the container specified as a DNS_LABEL.
     /// Each container in a pod must have a unique name (DNS_LABEL).
@@ -27,8 +48,19 @@ pub struct Container {
     pub name: String,
     /// Docker image name.
     pub image: String,
+    /// Entrypoint array. Not executed within a shell.
+    /// The docker image's ENTRYPOINT is used if this is not provided.
+    #[serde(default)]
+    pub command: Vec<String>,
     /// List of ports to expose from the container.
     pub ports: Vec<ContainerPort>,
+    /// Pod volumes to mount into the container's filesystem.
+    /// Cannot be updated.
+    #[serde(default)]
+    pub volume_mounts: Vec<VolumeMount>,
+    /// Compute Resources required by this container. Cannot be updated.
+    #[serde(default)]
+    pub resources: ResourceRequirements,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -37,6 +69,48 @@ pub struct ContainerPort {
     /// Number of port to expose on the pod's IP address.
     /// This must be a valid port number, 0 < x < 65536.
     pub container_port: u16,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeMount {
+    /// Path within the container at which the volume should be mounted.
+    pub mount_path: String,
+    /// This must match the Name of a Volume.
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ResourceRequirements {
+    /// Limits describes the maximum amount of compute resources allowed.
+    pub limits: Resource,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct Resource {
+    /// An integer value representing this container's
+    /// relative CPU weight versus other containers. Defaults to 100.
+    pub cpu: i64,
+    /// Memory limit in bytes. Defaults to 0.
+    pub memory: i64,
+}
+
+impl Default for Resource {
+    fn default() -> Self {
+        Resource {
+            cpu: 100,
+            memory: 0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Volume {
+    /// Volume's name.
+    /// Must be a DNS_LABEL and unique within the pod.
+    pub name: String,
+    // TODO
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
