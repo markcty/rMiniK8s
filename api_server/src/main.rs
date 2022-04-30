@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use anyhow::{Context, Result};
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Extension, Router,
 };
 use config::Config;
@@ -41,15 +41,28 @@ async fn main() -> Result<()> {
     let app_state = AppState::from_config(&config).await?;
     let shared_state = Arc::new(app_state);
 
+    #[rustfmt::skip]
+    let pod_routes = Router::new().nest(
+        "/pods",
+        Router::new()
+            .route("/", get(handler::pod::list))
+            .route("/:name",
+                post(handler::pod::create)
+                .get(handler::pod::get)
+                .put(handler::pod::replace)
+                .delete(handler::pod::delete),
+        ),
+    );
+
     let app = Router::new()
-        .route("/api/v1/watch/pods", get(handler::pod::watch_all))
-        .route("/api/v1/pods/:name", post(handler::pod::apply))
-        .route("/api/v1/pods/:name", get(handler::pod::get))
-        .route("/api/v1/pods/:name", put(handler::pod::replace))
-        .route("/api/v1/pods/:name", delete(handler::pod::delete))
-        .route("/api/v1/pods", get(handler::pod::list))
-        .route("/api/v1/nodes", get(handler::node::list))
-        .route("/api/v1/bindings/:name", post(handler::binding::bind))
+        .nest(
+            "/api/v1",
+            Router::new()
+                .merge(pod_routes)
+                .route("/nodes", get(handler::node::list))
+                .route("/bindings/:name", post(handler::binding::bind))
+                .route("/api/v1/watch/pods", get(handler::pod::watch_all)),
+        )
         .layer(Extension(shared_state));
 
     tracing::info!("Listening at 0.0.0.0:8080");

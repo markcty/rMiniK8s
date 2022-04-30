@@ -16,7 +16,7 @@ use super::{
 use crate::{etcd::forward_watch_to_ws, AppState};
 
 #[debug_handler]
-pub async fn apply(
+pub async fn create(
     Extension(app_state): Extension<Arc<AppState>>,
     Path(pod_name): Path<String>,
     Json(mut payload): Json<KubeObject>,
