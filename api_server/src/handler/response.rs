@@ -1,42 +1,9 @@
-use axum::{http::StatusCode, response::IntoResponse, Json};
-use serde::Serialize;
+use axum::Json;
+use resources::models::{ErrResponse, Response};
 
 use crate::etcd::EtcdError;
 
-#[derive(Debug, Serialize)]
-pub struct Response<T: Serialize> {
-    pub msg: Option<String>,
-    pub data: Option<T>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ErrResponse {
-    pub msg: String,
-    pub cause: Option<String>,
-}
-
 pub type HandlerResult<T> = Result<Json<Response<T>>, ErrResponse>;
-
-impl<T> Response<T>
-where
-    T: Serialize,
-{
-    pub fn new(msg: Option<String>, data: Option<T>) -> Self {
-        Self {
-            msg,
-            data,
-        }
-    }
-}
-
-impl ErrResponse {
-    pub fn new(msg: String, cause: Option<String>) -> Self {
-        Self {
-            msg,
-            cause,
-        }
-    }
-}
 
 impl From<EtcdError> for ErrResponse {
     fn from(err: EtcdError) -> Self {
@@ -50,11 +17,5 @@ impl From<EtcdError> for ErrResponse {
             // the error of database should not be forwarded to client
             cause: None,
         }
-    }
-}
-
-impl IntoResponse for ErrResponse {
-    fn into_response(self) -> axum::response::Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
     }
 }

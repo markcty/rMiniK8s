@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
                 .merge(pod_routes)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings/:name", post(handler::binding::bind))
-                .route("/api/v1/watch/pods", get(handler::pod::watch_all)),
+                .route("/watch/pods", get(handler::pod::watch_all)),
         )
         .layer(Extension(shared_state));
 

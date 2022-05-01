@@ -1,4 +1,5 @@
-use self::response::ErrResponse;
+use resources::models::ErrResponse;
+
 use crate::{etcd::EtcdClient, AppState};
 
 pub mod binding;

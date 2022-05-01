@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use etcd_client::{GetOptions, GetResponse};
-use resources::objects::KubeObject;
+use resources::{models::ErrResponse, objects::KubeObject};
 use serde::Serialize;
 
-use super::response::ErrResponse;
 use crate::{
     etcd::{self, kv_to_str},
     AppState,

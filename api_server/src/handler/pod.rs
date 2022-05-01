@@ -7,12 +7,12 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use etcd_client::*;
-use resources::objects::{pod::PodPhase, KubeObject, KubeResource, Object};
-
-use super::{
-    response::{ErrResponse, HandlerResult, Response},
-    utils::*,
+use resources::{
+    models::{ErrResponse, Response},
+    objects::{pod::PodPhase, KubeObject, KubeResource, Object},
 };
+
+use super::{response::HandlerResult, utils::*};
 use crate::{etcd::forward_watch_to_ws, AppState};
 
 #[debug_handler]

@@ -2,12 +2,9 @@ use std::sync::Arc;
 
 use axum::{Extension, Json};
 use axum_macros::debug_handler;
-use resources::objects::KubeObject;
+use resources::{models::Response, objects::KubeObject};
 
-use super::{
-    response::{HandlerResult, Response},
-    utils::etcd_get_objects_by_prefix,
-};
+use super::{response::HandlerResult, utils::etcd_get_objects_by_prefix};
 use crate::AppState;
 
 #[debug_handler]
