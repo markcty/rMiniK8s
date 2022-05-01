@@ -25,7 +25,7 @@ impl Volume {
 
     fn provision(&self) -> Result<()> {
         match &self.volume.config {
-            VolumeConfig::EmptyDir => self.provision_empty_dir(),
+            VolumeConfig::EmptyDir(_) => self.provision_empty_dir(),
             VolumeConfig::HostPath(path) => self.provision_host_path(path),
         }
     }
@@ -41,7 +41,7 @@ impl Volume {
 
     pub fn host_src(&self) -> String {
         match &self.volume.config {
-            VolumeConfig::EmptyDir => {
+            VolumeConfig::EmptyDir(_) => {
                 let mut path = PathBuf::from(&self.pod_dir);
                 path.push("volumes");
                 path.push(&self.volume.name);

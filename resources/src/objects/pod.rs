@@ -125,7 +125,7 @@ pub enum VolumeConfig {
     /// If the path is a symlink, it will follow the link to the real path.
     HostPath(String),
     /// EmptyDir represents a temporary directory that shares a pod's lifetime.
-    EmptyDir,
+    EmptyDir(()),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
