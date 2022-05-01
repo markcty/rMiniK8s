@@ -1,51 +1,32 @@
-use resources::objects::{
-    pod::{Pod as PodResource, *},
-    KubeObject, KubeResource, Metadata,
-};
+use std::{fs::File, path::PathBuf};
+
+use clap::Parser;
+use pod::Pod;
+use resources::objects::KubeObject;
 
 mod config;
 mod docker;
 mod pod;
+mod volume;
 
-use pod::Pod;
+#[derive(Parser)]
+#[clap(version, about, long_about = None)]
+struct Args {
+    /// Path to pod configuration file.
+    #[clap(short, long, parse(from_os_str))]
+    path: PathBuf,
+}
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let pod_spec = PodSpec {
-        containers: vec![
-            Container {
-                name: "nginx".to_string(),
-                image: "nginx:latest".to_string(),
-                ports: vec![ContainerPort {
-                    container_port: 80,
-                }],
-                ..Default::default()
-            },
-            Container {
-                name: "redis".to_string(),
-                image: "redis:latest".to_string(),
-                ports: vec![ContainerPort {
-                    container_port: 6379,
-                }],
-                ..Default::default()
-            },
-        ],
-        ..Default::default()
-    };
-    let object = KubeObject {
-        metadata: Metadata {
-            name: "nginx".to_string(),
-            ..Default::default()
-        },
-        resource: KubeResource::Pod(PodResource {
-            spec: pod_spec,
-            status: None,
-        }),
-    };
+    let args = Args::parse();
+    let path = args.path;
+    let file = File::open(path).unwrap();
+    let object: KubeObject = serde_yaml::from_reader(file).unwrap();
+
     let mut pod = Pod::create(object).await.unwrap();
-    println!("{:#?}", pod);
     pod.start().await.unwrap();
     pod.update_status().await.unwrap();
     println!("{:#?}", pod);

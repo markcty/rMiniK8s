@@ -110,7 +110,22 @@ pub struct Volume {
     /// Volume's name.
     /// Must be a DNS_LABEL and unique within the pod.
     pub name: String,
-    // TODO
+    #[serde(flatten)]
+    pub config: VolumeConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum VolumeConfig {
+    /// HostPath represents a pre-existing file
+    /// or directory on the host machine
+    /// that is directly exposed to the container.
+    ///
+    /// path (String): Path of the directory on the host.
+    /// If the path is a symlink, it will follow the link to the real path.
+    HostPath(String),
+    /// EmptyDir represents a temporary directory that shares a pod's lifetime.
+    EmptyDir,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

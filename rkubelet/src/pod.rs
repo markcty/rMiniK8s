@@ -1,4 +1,4 @@
-use std::default::Default;
+use std::{collections::HashMap, default::Default, fs::create_dir_all, path::PathBuf};
 
 use anyhow::{Context, Result};
 use bollard::{
@@ -8,14 +8,15 @@ use bollard::{
 use futures::future::try_join_all;
 use resources::objects::{
     pod,
-    pod::{ContainerStatus, PodSpec, PodStatus},
+    pod::{ContainerStatus, PodSpec, PodStatus, VolumeMount},
     KubeObject, KubeResource, Metadata,
 };
 use uuid::Uuid;
 
 use crate::{
-    config::{CONTAINER_NAME_PREFIX, PAUSE_CONTAINER_NAME, PAUSE_IMAGE_NAME},
+    config::{CONTAINER_NAME_PREFIX, PAUSE_CONTAINER_NAME, PAUSE_IMAGE_NAME, POD_DIR_PATH},
     docker::{Container, Image},
+    volume::Volume,
 };
 
 #[derive(Debug)]
@@ -54,6 +55,9 @@ impl Pod {
                 spec: resource.spec,
                 status: PodStatus::default(),
             };
+            create_dir_all(pod.dir())
+                .with_context(|| format!("Failed to create pod directory for {}", uid))?;
+
             let pause_container = pod.create_pause_container().await?;
             pod.create_containers(&pause_container).await?;
             pod.update_status().await?;
@@ -85,13 +89,17 @@ impl Pod {
     ) -> Result<Container> {
         let image = Image::create(&container.image).await;
         let mode = Some(format!("container:{}", pause_container.id()));
-        // TODO: Handle volume mounts
+
+        let volumes = self.create_volumes()?;
+        let binds = self.bind_mounts(&volumes, &container.volume_mounts)?;
+
         let host_config = Some(HostConfig {
             cpu_shares: Some(container.resources.limits.cpu),
             memory: Some(container.resources.limits.memory),
             network_mode: mode.to_owned(),
             ipc_mode: mode.to_owned(),
             pid_mode: mode.to_owned(),
+            binds,
             ..Default::default()
         });
         let config = Config {
@@ -149,6 +157,15 @@ impl Pod {
             .with_context(|| "Failed to inspect containers")
     }
 
+    fn create_volumes(&self) -> Result<HashMap<String, Volume>> {
+        let mut volumes = HashMap::new();
+        for volume in &self.spec.volumes {
+            let v = Volume::create(self.dir(), volume.to_owned())?;
+            volumes.insert(volume.name.to_owned(), v);
+        }
+        Ok(volumes)
+    }
+
     pub async fn update_status(&mut self) -> Result<()> {
         let response = self.pause_container().inspect().await?;
         let pod_ip = Pod::get_ip(&response).map(|ip| ip.to_owned());
@@ -179,6 +196,27 @@ impl Pod {
             .as_ref()
     }
 
+    fn bind_mounts(
+        &self,
+        volumes: &HashMap<String, Volume>,
+        volume_mounts: &Vec<VolumeMount>,
+    ) -> Result<Option<Vec<String>>> {
+        if volume_mounts.is_empty() {
+            return Ok(None);
+        }
+        let mut binds = vec![];
+        for volume_mount in volume_mounts {
+            let volume = volumes
+                .get(&volume_mount.name)
+                .with_context(|| format!("No volume {} found to mount", volume_mount.name))?;
+            let host_src = volume.host_src();
+            let container_dest = volume_mount.mount_path.to_owned();
+
+            binds.push(format!("{}:{}", host_src, container_dest.to_owned()));
+        }
+        Ok(Some(binds))
+    }
+
     fn unique_container_name(&self, container_name: &str) -> String {
         let uid = self.metadata.uid.expect("Pod with no uid");
         format!("{}_{}-{}", CONTAINER_NAME_PREFIX, container_name, uid)
@@ -194,5 +232,12 @@ impl Pod {
             .iter()
             .map(|container| Container::new(self.unique_container_name(&container.name)))
             .collect()
+    }
+
+    fn dir(&self) -> PathBuf {
+        let uid = self.metadata.uid.expect("Pod with no uid");
+        let mut dir = PathBuf::from(POD_DIR_PATH);
+        dir.push(uid.to_string());
+        dir
     }
 }
