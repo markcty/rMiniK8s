@@ -19,23 +19,23 @@ impl Arg {
             File::open(path).with_context(|| format!("Failed to open file {}", path.display()))?;
         let object: KubeObject = serde_yaml::from_reader(file)
             .with_context(|| format!("Failed to parse file {}", path.display()))?;
-        let msg =
-            apply(&object).with_context(|| format!("Failed to apply file {}", path.display()))?;
+        let msg = create(&object)
+            .with_context(|| format!("Failed to create using file {}", path.display()))?;
 
         println!("{}", msg);
         Ok(())
     }
 }
 
-fn apply(object: &KubeObject) -> Result<String> {
+fn create(object: &KubeObject) -> Result<String> {
     let client = reqwest::blocking::Client::new();
     let url = gen_url(object)?;
-    let res = client.post(url).json(&object).send()?.json::<ApplyRes>()?;
+    let res = client.post(url).json(&object).send()?.json::<CreateRes>()?;
     Ok(res.msg)
 }
 
 #[derive(Debug, Deserialize)]
-struct ApplyRes {
+struct CreateRes {
     msg: String,
 }
 

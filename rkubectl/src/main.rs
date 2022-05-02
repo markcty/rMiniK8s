@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 use reqwest::Url;
 use resources::objects;
 
-mod apply;
+mod create;
 
 struct AppConfig {
     base_url: Url,
@@ -33,16 +33,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Apply a configuration to a resource by file name.
-    /// This resource will be created if it doesn't exist yet.
-    Apply(apply::Arg),
+    /// Create a resource using configuration file.
+    Create(create::Arg),
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Apply(arg) => arg.handle()?,
+        Commands::Create(arg) => arg.handle()?,
     }
 
     Ok(())

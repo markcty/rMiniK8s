@@ -11,6 +11,7 @@ use resources::{
     models::{ErrResponse, Response},
     objects::{pod::PodPhase, KubeObject, KubeResource, Object},
 };
+use uuid::Uuid;
 
 use super::{response::HandlerResult, utils::*};
 use crate::{etcd::forward_watch_to_ws, AppState};
@@ -22,10 +23,11 @@ pub async fn create(
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    // Because we have only one type in KubeResource now,
-    // there will be a warning temporarily.
-    #[allow(irrefutable_let_patterns)]
     if let KubeResource::Pod(ref mut pod) = payload.resource {
+        payload.metadata.uid = Some(Uuid::new_v4());
+        payload.metadata.name = unique_pod_name(&pod_name);
+        let pod_name = &payload.metadata.name;
+
         let mut status = pod.status.clone().unwrap_or_default();
         status.phase = PodPhase::Pending;
         pod.status = Some(status);
@@ -37,11 +39,8 @@ pub async fn create(
     } else {
         // TODO: fill business logic and error handling
         return Err(ErrResponse::new(
-            String::from("apply error"),
-            Some(format!(
-                "the kind of payload: {}, which is not pod",
-                payload.kind()
-            )),
+            String::from("Error creating pod"),
+            Some(format!("Expecting pod kind, got {}", payload.kind())),
         ));
     }
 }
@@ -73,11 +72,8 @@ pub async fn replace(
         Ok(Json(res))
     } else {
         Err(ErrResponse::new(
-            String::from("replace error"),
-            Some(format!(
-                "the kind of payload: {}, which is not pod",
-                payload.kind()
-            )),
+            String::from("Error replacing pod"),
+            Some(format!("Expecting pod kind, got {}", payload.kind())),
         ))
     }
 }

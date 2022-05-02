@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use etcd_client::{GetOptions, GetResponse};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use resources::{models::ErrResponse, objects::KubeObject};
 use serde::Serialize;
 
@@ -93,4 +94,15 @@ pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {
     } else {
         Err(ErrResponse::new("value didn't exist".to_string(), None))
     }
+}
+
+pub fn unique_pod_name(name: &str) -> String {
+    let mut rng = thread_rng();
+    let suffix = (&mut rng)
+        .sample_iter(Alphanumeric)
+        .take(5)
+        .map(char::from)
+        .collect::<String>()
+        .to_lowercase();
+    format!("{}-{}", name, suffix)
 }

@@ -11,7 +11,6 @@ use resources::objects::{
     pod::{ContainerStatus, PodSpec, PodStatus, VolumeMount},
     KubeObject, KubeResource, Metadata,
 };
-use uuid::Uuid;
 
 use crate::{
     config::{CONTAINER_NAME_PREFIX, PAUSE_CONTAINER_NAME, PAUSE_IMAGE_NAME, POD_DIR_PATH},
@@ -43,19 +42,15 @@ impl Pod {
 
     pub async fn create(object: KubeObject) -> Result<Self> {
         if let KubeResource::Pod(resource) = object.resource {
-            tracing::info!("Creating pod {}...", object.metadata.name);
-
-            let mut metadata = object.metadata;
-            let uid = Uuid::new_v4();
-            metadata.uid = Some(uid);
-
+            let name = object.metadata.name.to_owned();
+            tracing::info!("Creating pod {}...", name);
             let mut pod = Self {
-                metadata,
+                metadata: object.metadata,
                 spec: resource.spec,
                 status: PodStatus::default(),
             };
             create_dir_all(pod.dir())
-                .with_context(|| format!("Failed to create pod directory for {}", uid))?;
+                .with_context(|| format!("Failed to create pod directory for {}", name))?;
 
             let pause_container = pod.create_pause_container().await?;
             pod.create_containers(&pause_container).await?;
@@ -253,7 +248,10 @@ impl Pod {
 
     fn unique_container_name(&self, container_name: &str) -> String {
         let uid = self.metadata.uid.expect("Pod with no uid");
-        format!("{}_{}-{}", CONTAINER_NAME_PREFIX, container_name, uid)
+        format!(
+            "{}_{}_{}_{}",
+            CONTAINER_NAME_PREFIX, container_name, self.metadata.name, uid
+        )
     }
 
     fn pause_container(&self) -> Container {

@@ -59,12 +59,14 @@ dependencies = [
  "etcd-client",
  "futures",
  "lazy_static",
+ "rand",
  "resources",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
