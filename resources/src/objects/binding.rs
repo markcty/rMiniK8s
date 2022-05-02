@@ -4,5 +4,5 @@ use super::object_reference::ObjectReference;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Binding {
-    target: ObjectReference,
+    pub target: ObjectReference,
 }

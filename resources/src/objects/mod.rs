@@ -5,6 +5,7 @@ use strum::Display;
 use uuid::Uuid;
 
 pub mod binding;
+pub mod node;
 pub mod object_reference;
 pub mod pod;
 
@@ -20,6 +21,7 @@ pub struct KubeObject {
 pub enum KubeResource {
     Pod(pod::Pod),
     Binding(binding::Binding),
+    Node(node::Node),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

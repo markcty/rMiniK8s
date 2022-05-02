@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::Path, Extension, Json};
+use axum::{Extension, Json};
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
@@ -22,11 +22,48 @@ use crate::{
 #[allow(dead_code)]
 pub async fn bind(
     Extension(app_state): Extension<Arc<AppState>>,
-    Path(pod_name): Path<String>,
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // check payload
-    if payload.kind() != "binding" {
+    #[allow(unused_variables)]
+    if let KubeResource::Binding(binding) = &payload.resource {
+        let pod_name = payload.name();
+        // get pod object
+        let mut object: KubeObject =
+            etcd_get_object(&app_state, format!("/api/v1/pods/{}", pod_name), None).await?;
+        // update pod
+        if let KubeResource::Pod(ref mut pod) = object.resource {
+            let mut status = pod.status.clone().unwrap_or_default();
+            status.conditions.insert(
+                PodConditionType::PodScheduled,
+                PodCondition {
+                    status: true,
+                },
+            );
+            // TODO: get the node, and get the address of that node, then set the host_ip according to that.
+            status.host_ip = Some("127.0.0.1".to_string());
+            pod.status = Some(status);
+        } else {
+            tracing::error!("object kind error");
+            return Err(ErrResponse::new(
+                String::from("bind error"),
+                Some(format!(
+                    "the kind of object: {}, which is not pod",
+                    object.kind()
+                )),
+            ));
+        }
+        // put it back
+        etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &object).await?;
+        etcd_put(
+            &app_state,
+            format!("/api/v1/bindings/{}", pod_name),
+            &payload,
+        )
+        .await?;
+        let res = Response::new(Some("bind successfully".to_string()), None);
+        Ok(Json(res))
+    } else {
         let res = ErrResponse::new(
             "bind error".to_string(),
             Some(format!(
@@ -34,42 +71,6 @@ pub async fn bind(
                 payload.kind()
             )),
         );
-        return Err(res);
+        Err(res)
     }
-    // get pod object
-    let mut object: KubeObject =
-        etcd_get_object(&app_state, format!("/api/v1/pods/{}", pod_name), None).await?;
-    // update pod
-    // Because we have only one type in KubeResource now,
-    // there will be a warning temporarily.
-    #[allow(irrefutable_let_patterns)]
-    if let KubeResource::Pod(ref mut pod) = object.resource {
-        let mut status = pod.status.clone().unwrap_or_default();
-        status.conditions.insert(
-            PodConditionType::PodScheduled,
-            PodCondition {
-                status: true,
-            },
-        );
-        pod.status = Some(status);
-    } else {
-        tracing::error!("object kind error");
-        return Err(ErrResponse::new(
-            String::from("bind error"),
-            Some(format!(
-                "the kind of object: {}, which is not pod",
-                object.kind()
-            )),
-        ));
-    }
-    // put it back
-    etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &object).await?;
-    etcd_put(
-        &app_state,
-        format!("/api/v1/bindings/{}", pod_name),
-        &payload,
-    )
-    .await?;
-    let res = Response::new(Some("bind successfully".to_string()), None);
-    Ok(Json(res))
 }
