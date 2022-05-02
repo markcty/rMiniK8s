@@ -30,10 +30,10 @@ async fn main() -> Result<()> {
             Box::pin(async {
                 let res = reqwest::get("http://localhost:8080/api/v1/pods")
                     .await?
-                    .json::<Response<Vec<(String, String)>>>()
+                    .json::<Response<Vec<KubeObject>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<(String, String)>, Error>(res)
+                Ok::<Vec<KubeObject>, Error>(res)
             })
         }),
         watcher: Box::new(|_| {
@@ -49,31 +49,28 @@ async fn main() -> Result<()> {
     let (tx_add, rx) = mpsc::channel::<PodUpdate>(16);
     let tx_update = tx_add.clone();
     let tx_delete = tx_add.clone();
-    let eh = EventHandler {
-        add_cls: Box::new(move |new| {
+    let eh = EventHandler::<KubeObject> {
+        add_cls: Box::new(move |pod| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();
             Box::pin(async move {
-                let pod: KubeObject = serde_json::from_str(&new)?;
                 let message = PodUpdate::Add(pod);
                 tx_add.send(message).await?;
                 Ok(())
             })
         }),
-        update_cls: Box::new(move |(_old, new)| {
+        update_cls: Box::new(move |(_old_pod, new_pod)| {
             let tx_update = tx_update.clone();
             Box::pin(async move {
-                let new_pod: KubeObject = serde_json::from_str(&new)?;
                 let message = PodUpdate::Update(new_pod);
                 tx_update.send(message).await?;
                 Ok(())
             })
         }),
-        delete_cls: Box::new(move |old| {
+        delete_cls: Box::new(move |old_pod| {
             let tx_delete = tx_delete.clone();
             Box::pin(async move {
-                let pod: KubeObject = serde_json::from_str(&old)?;
-                let message = PodUpdate::Delete(pod);
+                let message = PodUpdate::Delete(old_pod);
                 tx_delete.send(message).await?;
                 Ok(())
             })
