@@ -1,16 +1,18 @@
 use serde::{Deserialize, Serialize};
 
+use crate::objects::Object;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum WatchEvent {
-    Put(PutEvent),
+pub enum WatchEvent<T> {
+    Put(PutEvent<T>),
     Delete(DeleteEvent),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PutEvent {
+pub struct PutEvent<T> {
     pub key: String,
-    pub object: String,
+    pub object: T,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -18,8 +20,8 @@ pub struct DeleteEvent {
     pub key: String,
 }
 
-impl WatchEvent {
-    pub fn new_put(key: String, object: String) -> Self {
+impl<T: Object> WatchEvent<T> {
+    pub fn new_put(key: String, object: T) -> Self {
         WatchEvent::Put(PutEvent {
             key,
             object,

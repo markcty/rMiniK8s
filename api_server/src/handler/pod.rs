@@ -9,7 +9,7 @@ use axum_macros::debug_handler;
 use etcd_client::*;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{pod::PodPhase, KubeObject, KubeResource, Object},
+    objects::{pod::PodPhase, KubeObject, KubeResource},
 };
 use uuid::Uuid;
 
@@ -91,15 +91,11 @@ pub async fn delete(
 #[debug_handler]
 pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
-) -> HandlerResult<Vec<(String, String)>> {
+) -> HandlerResult<Vec<KubeObject>> {
     let pods =
         etcd_get_objects_by_prefix(&app_state, "/api/v1/pods".to_string(), Some("pod")).await?;
 
-    let res = pods
-        .iter()
-        .map(|o| (o.uri(), serde_json::to_string(o).unwrap()))
-        .collect::<Vec<(String, String)>>();
-    let res = Response::new(None, Some(res));
+    let res = Response::new(None, Some(pods));
     Ok(Json(res))
 }
 
@@ -121,5 +117,7 @@ pub async fn watch_all(
         })?;
     tracing::info!("Etcd watch created, watch id: {}", watcher.watch_id());
 
-    Ok(ws.on_upgrade(|socket| async move { forward_watch_to_ws(socket, watcher, stream).await }))
+    Ok(ws.on_upgrade(|socket| async move {
+        forward_watch_to_ws::<KubeObject>(socket, watcher, stream).await
+    }))
 }

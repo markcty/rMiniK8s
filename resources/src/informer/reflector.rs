@@ -1,30 +1,33 @@
+use std::fmt::Debug;
+
 use anyhow::{anyhow, Result};
 use futures_util::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
 use super::{ListerWatcher, Store};
-use crate::models::etcd::WatchEvent;
+use crate::{models::etcd::WatchEvent, objects::Object};
 
-pub(super) struct Reflector {
-    pub(super) lw: ListerWatcher,
-    pub(super) store: Store,
+pub(super) struct Reflector<T> {
+    pub(super) lw: ListerWatcher<T>,
+    pub(super) store: Store<T>,
 }
 
 #[derive(Debug)]
-pub(super) enum ReflectorNotification {
-    Add(String),
+pub(super) enum ReflectorNotification<T> {
+    Add(T),
     /// old value, new value
-    Update(String, String),
-    Delete(String),
+    Update(T, T),
+    Delete(T),
 }
 
-impl Reflector {
-    pub(super) async fn run(&self, tx: mpsc::Sender<ReflectorNotification>) -> Result<()> {
+impl<T: Object> Reflector<T> {
+    pub(super) async fn run(&self, tx: mpsc::Sender<ReflectorNotification<T>>) -> Result<()> {
         // pull the init changes
-        let kvs: Vec<(String, String)> = (self.lw.lister)(()).await?;
-        for (k, v) in kvs {
-            self.store.insert(k, v);
+        let objects: Vec<T> = (self.lw.lister)(()).await?;
+        for object in objects {
+            let key = object.uri();
+            self.store.insert(key, object);
         }
         let (_, mut receiver) = (self.lw.watcher)(()).await?.split();
 
@@ -39,7 +42,7 @@ impl Reflector {
             }
 
             if let Message::Text(msg) = msg {
-                let event: WatchEvent = serde_json::from_str(msg.as_str())?;
+                let event: WatchEvent<T> = serde_json::from_str(msg.as_str())?;
                 match event {
                     WatchEvent::Put(e) => {
                         if let Some(object) = self.store.get(&e.key) {

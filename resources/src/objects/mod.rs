@@ -1,4 +1,6 @@
-use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use strum::Display;
 use uuid::Uuid;
 
@@ -46,7 +48,7 @@ impl KubeObject {
     }
 }
 
-pub trait Object {
+pub trait Object: Clone + Serialize + DeserializeOwned + Send + Sync + Debug + 'static {
     fn uri(&self) -> String;
 }
 

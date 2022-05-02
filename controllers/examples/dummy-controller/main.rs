@@ -3,6 +3,7 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, WsStream},
     models,
+    objects::KubeObject,
 };
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
@@ -18,10 +19,10 @@ async fn main() -> Result<()> {
             Box::pin(async {
                 let res = reqwest::get("http://localhost:8080/api/v1/pods")
                     .await?
-                    .json::<models::Response<Vec<(String, String)>>>()
+                    .json::<models::Response<Vec<KubeObject>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<(String, String)>, Error>(res)
+                Ok::<Vec<KubeObject>, Error>(res)
             })
         }),
         watcher: Box::new(|_| {
@@ -42,7 +43,7 @@ async fn main() -> Result<()> {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();
             Box::pin(async move {
-                let message = format!("add\n{}", new);
+                let message = format!("add\n{:#?}", new);
                 tx_add.send(message).await?;
                 Ok(())
             })
@@ -50,7 +51,7 @@ async fn main() -> Result<()> {
         update_cls: Box::new(move |(old, new)| {
             let tx_update = tx_update.clone();
             Box::pin(async move {
-                let message = format!("update\n{}\n{}", old, new);
+                let message = format!("update\n{:#?}\n{:#?}", old, new);
                 tx_update.send(message).await?;
                 Ok(())
             })
@@ -58,7 +59,7 @@ async fn main() -> Result<()> {
         delete_cls: Box::new(move |old| {
             let tx_delete = tx_delete.clone();
             Box::pin(async move {
-                let message = format!("delete\n{}", old);
+                let message = format!("delete\n{:#?}", old);
                 tx_delete.send(message).await?;
                 Ok(())
             })

@@ -7,7 +7,7 @@ use futures::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use resources::models::etcd::WatchEvent;
+use resources::{models::etcd::WatchEvent, objects::Object};
 use serde::{Deserialize, Serialize};
 
 pub type EtcdPool = managed::Pool<EtcdManager>;
@@ -87,11 +87,15 @@ pub async fn put(
     Ok(())
 }
 
-pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: WatchStream) {
+pub async fn forward_watch_to_ws<T: Object>(
+    socket: WebSocket,
+    watcher: Watcher,
+    stream: WatchStream,
+) {
     let watch_id = watcher.watch_id();
     let (sender, receiver) = socket.split();
 
-    async fn ws_send(
+    async fn ws_send<T: Object>(
         mut sender: SplitSink<WebSocket, Message>,
         watcher: Watcher,
         mut stream: WatchStream,
@@ -111,15 +115,16 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
                 let msg = match event.event_type() {
                     EventType::Delete => {
                         let key = kv.key_str()?.to_string();
-                        let event = WatchEvent::new_delete(key);
+                        let event = WatchEvent::<T>::new_delete(key);
                         Message::Text(serde_json::to_string(&event)?)
                     },
                     EventType::Put => {
                         if let Some(kv) = event.kv() {
                             let key = kv.key_str()?.to_string();
                             let value = kv.value_str()?.to_string();
+                            let object: T = serde_json::from_str(&value)?;
 
-                            let event = WatchEvent::new_put(key, value);
+                            let event = WatchEvent::new_put(key, object);
                             Message::Text(serde_json::to_string(&event)?)
                         } else {
                             continue;
@@ -144,7 +149,7 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
     }
 
     tokio::select! {
-        res = ws_send(sender, watcher, stream) => {
+        res = ws_send::<T>(sender, watcher, stream) => {
             if let Err(e) = res {
                 tracing::error!("Etcd watch {} exit unexpectedly, caused by: {}", watch_id, e.to_string());
             }
