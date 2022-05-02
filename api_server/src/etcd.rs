@@ -72,7 +72,7 @@ type Result<T> = core::result::Result<T, EtcdError>;
 
 pub async fn put(
     client: &mut EtcdClient,
-    key: String,
+    key: &str,
     value: impl Serialize,
     option: Option<PutOptions>,
 ) -> Result<()> {
@@ -161,7 +161,7 @@ pub async fn forward_watch_to_ws(socket: WebSocket, watcher: Watcher, stream: Wa
 
 pub async fn get(
     client: &mut EtcdClient,
-    key: String,
+    key: &str,
     option: Option<GetOptions>,
 ) -> Result<GetResponse> {
     let res = client
@@ -174,15 +174,15 @@ pub async fn get(
 
 pub async fn delete(
     client: &mut EtcdClient,
-    key: String,
+    key: &str,
     option: Option<DeleteOptions>,
-) -> Result<()> {
-    let _ = client
+) -> Result<DeleteResponse> {
+    let res = client
         .delete(key, option)
         .await
-        .map_err(|err| EtcdError::new("Failed to delete".into(), Some(err.to_string())));
+        .map_err(|err| EtcdError::new("Failed to delete".into(), Some(err.to_string())))?;
     tracing::debug!("Successfully delete");
-    Ok(())
+    Ok(res)
 }
 
 pub fn kv_to_str(kv: &KeyValue) -> Result<(String, String)> {

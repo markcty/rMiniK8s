@@ -16,7 +16,7 @@ pub async fn etcd_put(
     val: impl Serialize,
 ) -> Result<(), ErrResponse> {
     let mut client = app_state.get_client().await?;
-    etcd::put(&mut client, key, val, None)
+    etcd::put(&mut client, &key, val, None)
         .await
         .map_err(ErrResponse::from)?;
     Ok(())
@@ -24,7 +24,7 @@ pub async fn etcd_put(
 
 pub async fn etcd_get(app_state: &Arc<AppState>, key: String) -> Result<GetResponse, ErrResponse> {
     let mut client = app_state.get_client().await?;
-    let res = etcd::get(&mut client, key, None)
+    let res = etcd::get(&mut client, &key, None)
         .await
         .map_err(ErrResponse::from)?;
     Ok(res)
@@ -32,10 +32,14 @@ pub async fn etcd_get(app_state: &Arc<AppState>, key: String) -> Result<GetRespo
 
 pub async fn etcd_delete(app_state: &Arc<AppState>, key: String) -> Result<(), ErrResponse> {
     let mut client = app_state.get_client().await?;
-    etcd::delete(&mut client, key, None)
+    let res = etcd::delete(&mut client, &key, None)
         .await
         .map_err(ErrResponse::from)?;
-    Ok(())
+    if res.deleted() > 0 {
+        Ok(())
+    } else {
+        Err(ErrResponse::not_found(format!("{} not found", &key), None))
+    }
 }
 
 pub async fn etcd_get_objects_by_prefix(
@@ -44,7 +48,7 @@ pub async fn etcd_get_objects_by_prefix(
     kind: Option<&str>,
 ) -> Result<Vec<KubeObject>, ErrResponse> {
     let mut client = app_state.get_client().await?;
-    let res = etcd::get(&mut client, prefix, Some(GetOptions::new().with_prefix()))
+    let res = etcd::get(&mut client, &prefix, Some(GetOptions::new().with_prefix()))
         .await
         .map_err(ErrResponse::from)?;
 
@@ -92,7 +96,10 @@ pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {
         let (_, val_str) = kv_to_str(kv)?;
         Ok(val_str)
     } else {
-        Err(ErrResponse::new("value didn't exist".to_string(), None))
+        Err(ErrResponse::not_found(
+            "value doesn't exist".to_string(),
+            None,
+        ))
     }
 }
 

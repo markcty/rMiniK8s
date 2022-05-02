@@ -1,4 +1,4 @@
-use axum::Json;
+use axum::{http::StatusCode, Json};
 use resources::models::{ErrResponse, Response};
 
 use crate::etcd::EtcdError;
@@ -16,6 +16,7 @@ impl From<EtcdError> for ErrResponse {
             msg: "Etcd Error".to_string(),
             // the error of database should not be forwarded to client
             cause: None,
+            status: StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

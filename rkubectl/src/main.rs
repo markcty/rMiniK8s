@@ -9,6 +9,8 @@ use reqwest::Url;
 use resources::objects;
 
 mod create;
+mod delete;
+mod utils;
 
 struct AppConfig {
     base_url: Url,
@@ -35,6 +37,8 @@ struct Cli {
 enum Commands {
     /// Create a resource using configuration file.
     Create(create::Arg),
+    /// Delete a resource by name.
+    Delete(delete::Arg),
 }
 
 fn main() -> Result<()> {
@@ -42,6 +46,7 @@ fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Create(arg) => arg.handle()?,
+        Commands::Delete(arg) => arg.handle()?,
     }
 
     Ok(())

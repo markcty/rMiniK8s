@@ -13,6 +13,8 @@ pub struct Response<T: Serialize> {
 pub struct ErrResponse {
     pub msg: String,
     pub cause: Option<String>,
+    #[serde(skip)]
+    pub status: StatusCode,
 }
 
 impl<T> Response<T>
@@ -32,12 +34,20 @@ impl ErrResponse {
         Self {
             msg,
             cause,
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+    pub fn not_found(msg: String, cause: Option<String>) -> Self {
+        Self {
+            msg,
+            cause,
+            status: StatusCode::NOT_FOUND,
         }
     }
 }
 
 impl IntoResponse for ErrResponse {
     fn into_response(self) -> axum::response::Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
+        (self.status, Json(self)).into_response()
     }
 }

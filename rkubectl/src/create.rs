@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use clap::Args;
 use serde::Deserialize;
 
-use crate::{objects::KubeObject, Url, CONFIG};
+use crate::{objects::KubeObject, utils::gen_url_from_object};
 
 #[derive(Args)]
 pub struct Arg {
@@ -29,7 +29,7 @@ impl Arg {
 
 fn create(object: &KubeObject) -> Result<String> {
     let client = reqwest::blocking::Client::new();
-    let url = gen_url(object)?;
+    let url = gen_url_from_object(object)?;
     let res = client.post(url).json(&object).send()?.json::<CreateRes>()?;
     Ok(res.msg)
 }
@@ -37,10 +37,4 @@ fn create(object: &KubeObject) -> Result<String> {
 #[derive(Debug, Deserialize)]
 struct CreateRes {
     msg: String,
-}
-
-fn gen_url(object: &KubeObject) -> Result<Url> {
-    let url = CONFIG.base_url.to_owned();
-    let path = format!("{}s/{}", object.kind(), object.metadata.name.to_lowercase());
-    Ok(url.join(path.as_str())?)
 }
