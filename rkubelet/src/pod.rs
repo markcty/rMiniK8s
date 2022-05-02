@@ -20,7 +20,6 @@ use crate::{
 };
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct Pod {
     metadata: Metadata,
     spec: PodSpec,
@@ -44,7 +43,7 @@ impl Pod {
 
     pub async fn create(object: KubeObject) -> Result<Self> {
         if let KubeResource::Pod(resource) = object.resource {
-            tracing::info!("Creating pod containers...");
+            tracing::info!("Creating pod {}...", object.metadata.name);
 
             let mut metadata = object.metadata;
             let uid = Uuid::new_v4();
@@ -68,9 +67,8 @@ impl Pod {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn start(&self) -> Result<()> {
-        tracing::info!("Starting pod containers...");
+        tracing::info!("Starting pod {}...", self.metadata.name);
         let containers = self
             .status
             .container_statuses
@@ -79,7 +77,23 @@ impl Pod {
             .collect::<Vec<Container>>();
         self.start_containers(&containers)
             .await
-            .map(|_| tracing::info!("Pod created"))
+            .map(|_| tracing::info!("Pod {} created", self.metadata.name))
+    }
+
+    pub async fn stop(&self) -> Result<()> {
+        tracing::info!("Stopping pod {}...", self.metadata.name);
+        self.stop_containers()
+            .await
+            .map(|_| tracing::info!("Pod {} stopped", self.metadata.name))
+    }
+
+    pub async fn remove(&self) -> Result<()> {
+        tracing::info!("Removing pod {}...", self.metadata.name);
+        self.stop().await?;
+        self.remove_containers()
+            .await
+            .map(|_| tracing::info!("Pod {} removed", self.metadata.name))
+        // TODO: Remove pod directory (DANGEROUS!)
     }
 
     async fn create_container(
@@ -155,6 +169,26 @@ impl Pod {
         try_join_all(tasks)
             .await
             .with_context(|| "Failed to inspect containers")
+    }
+
+    async fn stop_containers(&self) -> Result<()> {
+        let containers = self.containers();
+        let tasks = containers.iter().map(|c| c.stop()).collect::<Vec<_>>();
+        try_join_all(tasks)
+            .await
+            .with_context(|| "Failed to stop containers")?;
+        self.pause_container().stop().await?;
+        Ok(())
+    }
+
+    async fn remove_containers(&self) -> Result<()> {
+        let containers = self.containers();
+        let tasks = containers.iter().map(|c| c.remove()).collect::<Vec<_>>();
+        try_join_all(tasks)
+            .await
+            .with_context(|| "Failed to remove containers")?;
+        self.pause_container().remove().await?;
+        Ok(())
     }
 
     fn create_volumes(&self) -> Result<HashMap<String, Volume>> {
@@ -239,5 +273,9 @@ impl Pod {
         let mut dir = PathBuf::from(POD_DIR_PATH);
         dir.push(uid.to_string());
         dir
+    }
+
+    pub fn metadata(&self) -> &Metadata {
+        &self.metadata
     }
 }

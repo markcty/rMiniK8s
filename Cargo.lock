@@ -1608,6 +1608,7 @@ dependencies = [
  "bollard",
  "clap",
  "config",
+ "dashmap",
  "futures",
  "lazy_static",
  "reqwest",

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Error, Result};
 use reqwest::Url;
 use resources::{
@@ -5,10 +7,10 @@ use resources::{
     models::Response,
     objects::KubeObject,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::connect_async;
 
-use crate::{models::PodUpdate, pod_worker::PodWorker};
+use crate::{models::PodUpdate, pod_manager::PodManager, pod_worker::PodWorker};
 
 mod config;
 mod docker;
@@ -82,8 +84,9 @@ async fn main() -> Result<()> {
     let informer = Informer::new(lw, eh);
     let informer_handle = tokio::spawn(async move { informer.run().await });
 
+    let pod_manager = Arc::new(Mutex::new(PodManager::new()));
     // Start pod worker
-    let pod_worker = PodWorker::new();
+    let mut pod_worker = PodWorker::new(pod_manager);
     let pod_worker_handle = tokio::spawn(async move { pod_worker.run(rx).await });
 
     pod_worker_handle.await?.expect("Pod worker failed");

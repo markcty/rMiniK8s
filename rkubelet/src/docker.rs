@@ -96,6 +96,20 @@ impl Container {
             .await
             .with_context(|| format!("Failed to inspect container {}", self.id))
     }
+
+    pub async fn stop(&self) -> Result<()> {
+        DOCKER
+            .stop_container(self.id.as_str(), None)
+            .await
+            .with_context(|| format!("Failed to stop container {}", self.id))
+    }
+
+    pub async fn remove(&self) -> Result<()> {
+        DOCKER
+            .remove_container(self.id.as_str(), None)
+            .await
+            .with_context(|| format!("Failed to remove container {}", self.id))
+    }
 }
 
 impl From<&ContainerStatus> for Container {
