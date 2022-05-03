@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Ok, Result};
 use resources::{
     models,
     objects::{
@@ -7,20 +7,24 @@ use resources::{
 };
 use tokio::sync::mpsc::Receiver;
 
+use crate::cache::Cache;
+
 pub struct Scheduler<T>
 where
-    T: Fn(&KubeObject, &Vec<KubeObject>) -> ObjectReference,
+    T: Fn(&KubeObject, &Cache) -> ObjectReference,
 {
+    cache: Cache,
     algorithm: T,
     client: reqwest::Client,
 }
 
 impl<T> Scheduler<T>
 where
-    T: Fn(&KubeObject, &Vec<KubeObject>) -> ObjectReference,
+    T: Fn(&KubeObject, &Cache) -> ObjectReference,
 {
-    pub fn new(algorithm: T) -> Scheduler<T> {
+    pub fn new(algorithm: T, cache: Cache) -> Scheduler<T> {
         Scheduler {
+            cache,
             algorithm,
             client: reqwest::Client::new(),
         }
@@ -29,12 +33,7 @@ where
     pub async fn run(&self, mut pod_queue: Receiver<KubeObject>) -> Result<()> {
         while let Some(pod) = pod_queue.recv().await {
             tracing::info!("schedule pod: {}", pod.name());
-            let res = reqwest::get("http://localhost:8080/api/v1/nodes")
-                .await?
-                .json::<models::Response<Vec<KubeObject>>>()
-                .await?;
-            let nodes = res.data.ok_or_else(|| anyhow!("list nodes failed"))?;
-            let node = (self.algorithm)(&pod, &nodes);
+            let node = (self.algorithm)(&pod, &self.cache);
             self.bind(pod, node).await?;
         }
         Ok(())

@@ -1,82 +1,27 @@
-use anyhow::{anyhow, Error, Result};
-use reqwest::Url;
-use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, WsStream},
-    models,
-    objects::KubeObject,
-};
-use tokio::sync::mpsc;
-use tokio_tungstenite::connect_async;
+use anyhow::Result;
 
-use crate::scheduler::Scheduler;
+use crate::{cache::Cache, informer::*, scheduler::Scheduler};
 
 mod algorithm;
+mod cache;
+mod informer;
 mod scheduler;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
-    tracing::info!("scheduler start");
 
-    // create list watcher closures
-    // TODO: maybe some crate or macros can simplify the tedious boxed closure creation in heap
-    let lw = ListerWatcher {
-        lister: Box::new(|_| {
-            Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/pods")
-                    .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
-                    .await?;
-                let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
-            })
-        }),
-        watcher: Box::new(|_| {
-            Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/pods")?;
-                let (stream, _) = connect_async(url).await?;
-                Ok::<WsStream, Error>(stream)
-            })
-        }),
-    };
+    let (pod_rx, pod_store, pod_informer_handler) = run_pod_informer();
+    let (_, node_store, node_informer_handler) = run_node_informer();
 
-    // create event handler closures
-    let (tx_add, rx) = mpsc::channel::<KubeObject>(16);
-    let eh = EventHandler::<KubeObject> {
-        add_cls: Box::new(move |pod| {
-            // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
-            let tx_add = tx_add.clone();
-            Box::pin(async move {
-                if pod.kind() == "pod" {
-                    tracing::debug!("add\n{}", pod.name());
-                    tx_add.send(pod).await?;
-                } else {
-                    tracing::error!("There are some errors with the kind of object.");
-                }
-                Ok(())
-            })
-        }),
-        update_cls: Box::new(move |(old, new)| {
-            Box::pin(async move {
-                tracing::debug!("update\n{}\n{}", old.name(), new.name());
-                Ok(())
-            })
-        }),
-        delete_cls: Box::new(move |old| {
-            Box::pin(async move {
-                tracing::debug!("delete\n{}", old.name());
-                Ok(())
-            })
-        }),
-    };
+    let cache = Cache::new(pod_store.clone(), node_store.clone());
+    let sched = Scheduler::new(algorithm::dummy::dummy, cache);
+    let scheduler_handle = tokio::spawn(async move { sched.run(pod_rx).await });
 
-    // start the informer
-    let informer = Informer::new(lw, eh);
-    let informer_handler = tokio::spawn(async move { informer.run().await });
+    tracing::info!("scheduler started");
 
-    let sched = Scheduler::new(algorithm::dummy::dummy);
-    let scheduler_handle = tokio::spawn(async move { sched.run(rx).await });
-
-    scheduler_handle.await?.expect("scheduler work failed.");
-    informer_handler.await?
+    scheduler_handle.await?.expect("scheduler failed.");
+    pod_informer_handler.await?.expect("pod informer failed.");
+    node_informer_handler.await?
+    // TODO: Gracefully shutdown
 }

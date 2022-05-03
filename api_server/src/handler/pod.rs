@@ -32,8 +32,6 @@ pub async fn create(
         pod.status = Some(status);
         etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &payload).await?;
         let res = Response::new(Some(format!("pod/{} created", pod_name)), None);
-        let queue = &mut app_state.schedule_queue.write().unwrap();
-        queue.push(payload);
         Ok(Json(res))
     } else {
         // TODO: fill business logic and error handling

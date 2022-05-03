@@ -1680,6 +1680,7 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dashmap",
  "reqwest",
  "resources",
  "serde_json",
