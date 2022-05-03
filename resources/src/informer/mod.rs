@@ -34,10 +34,10 @@ pub struct Informer<T> {
 }
 
 impl<T: Object> Informer<T> {
-    pub fn new(lw: ListerWatcher<T>, eh: EventHandler<T>) -> Self {
+    pub fn new(lw: ListerWatcher<T>, eh: EventHandler<T>, store: Arc<Store<T>>) -> Self {
         let reflector = Reflector {
             lw,
-            store: DashMap::new(),
+            store: store,
         };
         Self {
             reflector: Arc::new(reflector),

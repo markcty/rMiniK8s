@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Error, Result};
+use dashmap::DashMap;
 use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, WsStream},
@@ -78,7 +79,8 @@ async fn main() -> Result<()> {
     };
 
     // Start the informer
-    let informer = Informer::new(lw, eh);
+    let store = Arc::new(DashMap::new());
+    let informer = Informer::new(lw, eh, store);
     let informer_handle = tokio::spawn(async move { informer.run().await });
 
     let pod_manager = Arc::new(Mutex::new(PodManager::new()));

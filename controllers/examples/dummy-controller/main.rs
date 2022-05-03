@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Error, Result};
+use dashmap::DashMap;
 use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, WsStream},
@@ -67,12 +70,14 @@ async fn main() -> Result<()> {
     };
 
     // start the informer
-    let informer = Informer::new(lw, eh);
+    let store = Arc::new(DashMap::new());
+    let informer = Informer::new(lw, eh, store.clone());
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
     while let Some(s) = rx.recv().await {
         // you can do deserializing and controller related stuff here
         println!("{}", s);
+        println!("store size: {}", store.len());
     }
 
     informer_handler.await?

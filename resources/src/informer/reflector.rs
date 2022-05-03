@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use futures_util::stream::StreamExt;
@@ -10,7 +10,7 @@ use crate::{models::etcd::WatchEvent, objects::Object};
 
 pub(super) struct Reflector<T> {
     pub(super) lw: ListerWatcher<T>,
-    pub(super) store: Store<T>,
+    pub(super) store: Arc<Store<T>>,
 }
 
 #[derive(Debug)]
