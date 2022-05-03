@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::{sync::Mutex, time::sleep};
 
-use crate::pod_manager::PodManager;
+use crate::{config::CONFIG, pod_manager::PodManager};
 
 pub struct StatusManager {
     pod_manager: Arc<Mutex<PodManager>>,
@@ -26,7 +26,10 @@ impl StatusManager {
                     tracing::info!("Pod {} status changed", pod.metadata().name);
                 }
             }
-            sleep(std::time::Duration::from_secs(5)).await;
+            sleep(std::time::Duration::from_secs(
+                CONFIG.pod_status_update_frequency,
+            ))
+            .await;
         }
     }
 }

@@ -12,7 +12,7 @@ use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::connect_async;
 
 use crate::{
-    models::PodUpdate, pod_manager::PodManager, pod_worker::PodWorker,
+    config::CONFIG, models::PodUpdate, pod_manager::PodManager, pod_worker::PodWorker,
     status_manager::StatusManager,
 };
 
@@ -31,9 +31,9 @@ async fn main() -> Result<()> {
     tracing::info!("rKubelet started");
 
     let lw = ListerWatcher {
-        lister: Box::new(|_| {
+        lister: Box::new(move |_| {
             Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/pods")
+                let res = reqwest::get(format!("{}/api/v1/pods", CONFIG.api_server_url))
                     .await?
                     .json::<Response<Vec<KubeObject>>>()
                     .await?;
@@ -43,7 +43,9 @@ async fn main() -> Result<()> {
         }),
         watcher: Box::new(|_| {
             Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/pods")?;
+                let url = Url::parse(
+                    format!("{}/api/v1/watch/pods", CONFIG.api_server_watch_url).as_str(),
+                )?;
                 let (stream, _) = connect_async(url).await?;
                 Ok::<WsStream, Error>(stream)
             })
