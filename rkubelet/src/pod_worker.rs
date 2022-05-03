@@ -21,11 +21,27 @@ impl PodWorker {
         while let Some(update) = work_queue.recv().await {
             match update {
                 PodUpdate::Add(pod) => {
-                    tracing::info!("Pod added: {}", pod.metadata.name);
-                    let pod = Pod::create(pod).await?;
-                    pod.start().await?;
-                    let mut pod_manager = self.pod_manager.lock().await;
-                    pod_manager.add_pod(pod);
+                    let name = pod.metadata.name.to_owned();
+                    tracing::info!("Pod added: {}", name);
+                    let res = Pod::create(pod).await;
+                    match res {
+                        Ok(pod) => {
+                            let res = pod.start().await;
+                            match res {
+                                Ok(_) => {
+                                    tracing::info!("Pod {} started", name);
+                                },
+                                Err(err) => {
+                                    tracing::error!("Pod {} failed to start: {}", name, err);
+                                },
+                            }
+                            let mut pod_manager = self.pod_manager.lock().await;
+                            pod_manager.add_pod(pod);
+                        },
+                        Err(err) => {
+                            tracing::error!("Failed to create pod {}: {:#?}", name, err);
+                        },
+                    }
                 },
                 PodUpdate::Update(_) => {},
                 PodUpdate::Delete(pod) => {
@@ -36,7 +52,15 @@ impl PodWorker {
                     {
                         let pod = pm.get_pod(name.as_str());
                         if let Some(pod) = pod {
-                            pod.remove().await?;
+                            let res = pod.remove().await;
+                            match res {
+                                Ok(_) => {
+                                    tracing::info!("Pod {} removed", name);
+                                },
+                                Err(err) => {
+                                    tracing::error!("Failed to remove pod {}: {}", name, err);
+                                },
+                            }
                         } else {
                             tracing::warn!("Pod not found: {}", name);
                         }
