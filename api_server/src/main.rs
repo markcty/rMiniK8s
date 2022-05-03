@@ -60,6 +60,7 @@ async fn main() -> Result<()> {
             Router::new()
                 .merge(pod_routes)
                 .route("/nodes", get(handler::node::list))
+                .route("/watch/nodes", get(handler::node::watch_all))
                 .route("/bindings", post(handler::binding::bind))
                 .route("/watch/pods", get(handler::pod::watch_all)),
         )

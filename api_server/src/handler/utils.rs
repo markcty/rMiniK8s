@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use etcd_client::{GetOptions, GetResponse};
+use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use resources::{models::ErrResponse, objects::KubeObject};
 use serde::Serialize;
@@ -89,6 +89,24 @@ pub async fn etcd_get_object(
         }
     }
     Ok(object)
+}
+
+pub async fn etcd_watch_uri(
+    app_state: &Arc<AppState>,
+    uri: &str,
+) -> Result<(Watcher, WatchStream), ErrResponse> {
+    let mut client = app_state.get_client().await?;
+    let (watcher, stream) = client
+        .watch(uri, Some(WatchOptions::new().with_prefix()))
+        .await
+        .map_err(|err| {
+            ErrResponse::new(
+                "Failed to establish watch connection".to_string(),
+                Some(err.to_string()),
+            )
+        })?;
+    tracing::info!("Etcd watch created, watch id: {}", watcher.watch_id());
+    Ok((watcher, stream))
 }
 
 pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {

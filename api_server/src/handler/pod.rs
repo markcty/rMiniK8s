@@ -6,7 +6,6 @@ use axum::{
     Extension, Json,
 };
 use axum_macros::debug_handler;
-use etcd_client::*;
 use resources::{
     models::{ErrResponse, Response},
     objects::{pod::PodPhase, KubeObject, KubeResource},
@@ -105,17 +104,7 @@ pub async fn watch_all(
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, ErrResponse> {
     // open etcd watch connection
-    let mut client = app_state.get_client().await?;
-    let (watcher, stream) = client
-        .watch("/api/v1/pods", Some(WatchOptions::new().with_prefix()))
-        .await
-        .map_err(|err| {
-            ErrResponse::new(
-                "Failed to establish watch connection".to_string(),
-                Some(err.to_string()),
-            )
-        })?;
-    tracing::info!("Etcd watch created, watch id: {}", watcher.watch_id());
+    let (watcher, stream) = etcd_watch_uri(&app_state, "/api/v1/pods").await?;
 
     Ok(ws.on_upgrade(|socket| async move {
         forward_watch_to_ws::<KubeObject>(socket, watcher, stream).await
