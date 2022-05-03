@@ -3,12 +3,12 @@ use std::{collections::HashMap, default::Default, fs::create_dir_all, path::Path
 use anyhow::{Context, Result};
 use bollard::{
     container::Config,
-    models::{ContainerInspectResponse, HostConfig},
+    models::{ContainerInspectResponse, ContainerStateStatusEnum, HostConfig},
 };
 use futures::future::try_join_all;
 use resources::objects::{
     pod,
-    pod::{ContainerStatus, PodSpec, PodStatus, VolumeMount},
+    pod::{ContainerStatus, PodPhase, PodSpec, PodStatus, VolumeMount},
     KubeObject, KubeResource, Metadata,
 };
 
@@ -199,15 +199,13 @@ impl Pod {
     pub async fn update_status(&mut self) -> Result<bool> {
         let response = self.pause_container().inspect().await?;
         let pod_ip = Pod::get_ip(&response).map(|ip| ip.to_owned());
+        let containers = self.inspect_containers().await?;
+        let phase = self.compute_phase(&containers);
         // TODO: strip uid off container names
-        let container_statuses = self
-            .inspect_containers()
-            .await?
-            .into_iter()
-            .map(ContainerStatus::from)
-            .collect();
+        let container_statuses = containers.into_iter().map(ContainerStatus::from).collect();
         // TODO: determine pod conditions
         let new_status = PodStatus {
+            phase,
             pod_ip,
             container_statuses,
             ..self.status.clone()
@@ -278,5 +276,60 @@ impl Pod {
 
     pub fn metadata(&self) -> &Metadata {
         &self.metadata
+    }
+
+    pub fn object(&self) -> KubeObject {
+        KubeObject {
+            metadata: self.metadata.clone(),
+            resource: KubeResource::Pod(pod::Pod {
+                spec: self.spec.clone(),
+                status: Some(self.status.clone()),
+            }),
+        }
+    }
+
+    fn compute_phase(&self, containers: &Vec<ContainerInspectResponse>) -> PodPhase {
+        let mut running = 0;
+        let mut failed = 0;
+        let mut exited = 0;
+        for container in containers {
+            let state = &container.state;
+            if let Some(state) = state {
+                let status = state.status;
+                if let Some(status) = status {
+                    match status {
+                        ContainerStateStatusEnum::RUNNING => running += 1,
+                        ContainerStateStatusEnum::EXITED => {
+                            if let Some(exit_code) = state.exit_code {
+                                if exit_code != 0 {
+                                    failed += 1;
+                                } else {
+                                    exited += 1;
+                                }
+                            } else {
+                                exited += 1;
+                            }
+                        },
+                        ContainerStateStatusEnum::DEAD | ContainerStateStatusEnum::PAUSED => {
+                            failed += 1
+                        },
+                        ContainerStateStatusEnum::RESTARTING => running += 1,
+                        _ => (),
+                    }
+                }
+            }
+        }
+        let total = self.spec.containers.len();
+        if running == 0 {
+            if failed > 0 {
+                return PodPhase::Failed;
+            } else if exited == total {
+                return PodPhase::Succeeded;
+            }
+        }
+        if running > 0 && failed == 0 {
+            return PodPhase::Running;
+        }
+        PodPhase::Pending
     }
 }
