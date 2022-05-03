@@ -25,10 +25,10 @@ async fn main() -> Result<()> {
             Box::pin(async {
                 let res = reqwest::get("http://localhost:8080/api/v1/pods")
                     .await?
-                    .json::<models::Response<Vec<(String, String)>>>()
+                    .json::<models::Response<Vec<KubeObject>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<(String, String)>, Error>(res)
+                Ok::<Vec<KubeObject>, Error>(res)
             })
         }),
         watcher: Box::new(|_| {
@@ -42,14 +42,13 @@ async fn main() -> Result<()> {
 
     // create event handler closures
     let (tx_add, rx) = mpsc::channel::<KubeObject>(16);
-    let eh = EventHandler {
-        add_cls: Box::new(move |new| {
+    let eh = EventHandler::<KubeObject> {
+        add_cls: Box::new(move |pod| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();
             Box::pin(async move {
-                let pod: KubeObject = serde_json::from_str(&new)?;
                 if pod.kind() == "pod" {
-                    tracing::debug!("add\n{}", new);
+                    tracing::debug!("add\n{}", pod.name());
                     tx_add.send(pod).await?;
                 } else {
                     tracing::error!("There are some errors with the kind of object.");
@@ -59,13 +58,13 @@ async fn main() -> Result<()> {
         }),
         update_cls: Box::new(move |(old, new)| {
             Box::pin(async move {
-                tracing::debug!("update\n{}\n{}", old, new);
+                tracing::debug!("update\n{}\n{}", old.name(), new.name());
                 Ok(())
             })
         }),
         delete_cls: Box::new(move |old| {
             Box::pin(async move {
-                tracing::debug!("delete\n{}", old);
+                tracing::debug!("delete\n{}", old.name());
                 Ok(())
             })
         }),
