@@ -195,7 +195,8 @@ impl Pod {
         Ok(volumes)
     }
 
-    pub async fn update_status(&mut self) -> Result<()> {
+    /// Update pod status, return true if pod status changed.
+    pub async fn update_status(&mut self) -> Result<bool> {
         let response = self.pause_container().inspect().await?;
         let pod_ip = Pod::get_ip(&response).map(|ip| ip.to_owned());
         // TODO: strip uid off container names
@@ -206,12 +207,14 @@ impl Pod {
             .map(ContainerStatus::from)
             .collect();
         // TODO: determine pod conditions
-        self.status = PodStatus {
+        let new_status = PodStatus {
             pod_ip,
             container_statuses,
-            ..Default::default()
+            ..self.status.clone()
         };
-        Ok(())
+        let changed = new_status != self.status;
+        self.status = new_status;
+        Ok(changed)
     }
 
     fn get_ip(response: &ContainerInspectResponse) -> Option<&String> {

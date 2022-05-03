@@ -11,7 +11,10 @@ use resources::{
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::connect_async;
 
-use crate::{models::PodUpdate, pod_manager::PodManager, pod_worker::PodWorker};
+use crate::{
+    models::PodUpdate, pod_manager::PodManager, pod_worker::PodWorker,
+    status_manager::StatusManager,
+};
 
 mod config;
 mod docker;
@@ -19,6 +22,7 @@ mod models;
 mod pod;
 mod pod_manager;
 mod pod_worker;
+mod status_manager;
 mod volume;
 
 #[tokio::main]
@@ -83,11 +87,17 @@ async fn main() -> Result<()> {
     let informer = Informer::new(lw, eh, store);
     let informer_handle = tokio::spawn(async move { informer.run().await });
 
-    let pod_manager = Arc::new(Mutex::new(PodManager::new()));
+    let pm = Arc::new(Mutex::new(PodManager::new()));
+    let pm_sm = Arc::clone(&pm);
+
     // Start pod worker
-    let mut pod_worker = PodWorker::new(pod_manager);
+    let mut pod_worker = PodWorker::new(pm);
     let pod_worker_handle = tokio::spawn(async move { pod_worker.run(rx).await });
 
+    let mut status_manager = StatusManager::new(pm_sm);
+    let status_manager_handle = tokio::spawn(async move { status_manager.run().await });
+
+    status_manager_handle.await?.expect("Status manager failed");
     pod_worker_handle.await?.expect("Pod worker failed");
     informer_handle.await?
     // TODO: Gracefully shutdown

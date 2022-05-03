@@ -132,7 +132,7 @@ pub enum VolumeConfig {
     EmptyDir(()),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PodStatus {
     /// IP address of the host to which the pod is assigned.
@@ -174,7 +174,7 @@ impl Default for PodStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Display)]
+#[derive(Debug, Serialize, Deserialize, Clone, Display, Eq, PartialEq)]
 pub enum PodPhase {
     /// All containers in the pod have terminated,
     /// and at least one container has terminated in failure.
@@ -210,14 +210,14 @@ pub enum PodConditionType {
     Ready,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
 pub struct PodCondition {
     /// Status is the status of the condition.
     /// Can be True, False, Unknown.
     pub status: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum ContainerState {
     Running,
     Terminated,
@@ -242,7 +242,7 @@ impl From<Option<bollard::models::ContainerState>> for ContainerState {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerStatus {
     /// This must be a DNS_LABEL.

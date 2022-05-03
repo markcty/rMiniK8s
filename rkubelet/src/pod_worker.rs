@@ -31,18 +31,17 @@ impl PodWorker {
                 PodUpdate::Delete(pod) => {
                     let name = pod.metadata.name;
                     tracing::info!("Pod deleted: {}", name);
+                    let mut pm = self.pod_manager.lock().await;
                     // Avoid immutable and mutable borrow conflict
                     {
-                        let pod_manager = self.pod_manager.lock().await;
-                        let pod = pod_manager.get_pod(name.as_str());
+                        let pod = pm.get_pod(name.as_str());
                         if let Some(pod) = pod {
                             pod.remove().await?;
                         } else {
                             tracing::warn!("Pod not found: {}", name);
                         }
                     }
-                    let mut pod_manager = self.pod_manager.lock().await;
-                    pod_manager.remove_pod(name.as_str());
+                    pm.remove_pod(name.as_str());
                 },
             }
         }

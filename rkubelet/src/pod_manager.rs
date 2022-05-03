@@ -26,4 +26,8 @@ impl PodManager {
     pub fn remove_pod(&mut self, name: &str) {
         self.pods.remove(name);
     }
+
+    pub fn iter_mut(&self) -> dashmap::iter::IterMut<String, Pod> {
+        self.pods.iter_mut()
+    }
 }
