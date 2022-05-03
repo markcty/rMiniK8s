@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::{anyhow, Ok, Result};
 use resources::{
     models,
     objects::{
@@ -9,7 +9,7 @@ use tokio::sync::mpsc::Receiver;
 
 pub struct Scheduler<T>
 where
-    T: Fn(&KubeObject) -> KubeObject,
+    T: Fn(&KubeObject, &Vec<KubeObject>) -> ObjectReference,
 {
     algorithm: T,
     client: reqwest::Client,
@@ -17,7 +17,7 @@ where
 
 impl<T> Scheduler<T>
 where
-    T: Fn(&KubeObject) -> KubeObject,
+    T: Fn(&KubeObject, &Vec<KubeObject>) -> ObjectReference,
 {
     pub fn new(algorithm: T) -> Scheduler<T> {
         Scheduler {
@@ -29,23 +29,25 @@ where
     pub async fn run(&self, mut pod_queue: Receiver<KubeObject>) -> Result<()> {
         while let Some(pod) = pod_queue.recv().await {
             tracing::info!("schedule pod: {}", pod.name());
-            let node = (self.algorithm)(&pod);
+            let res = reqwest::get("http://localhost:8080/api/v1/nodes")
+                .await?
+                .json::<models::Response<Vec<KubeObject>>>()
+                .await?;
+            let nodes = res.data.ok_or_else(|| anyhow!("list nodes failed"))?;
+            let node = (self.algorithm)(&pod, &nodes);
             self.bind(pod, node).await?;
         }
         Ok(())
     }
 
-    async fn bind(&self, pod: KubeObject, node: KubeObject) -> Result<()> {
+    async fn bind(&self, pod: KubeObject, node: ObjectReference) -> Result<()> {
         let binding = KubeObject {
             metadata: Metadata {
                 name: pod.name(),
                 uid: pod.metadata.uid,
             },
             resource: KubeResource::Binding(Binding {
-                target: ObjectReference {
-                    kind: "node".to_string(),
-                    name: node.name(),
-                },
+                target: node,
             }),
         };
         let _ = self
