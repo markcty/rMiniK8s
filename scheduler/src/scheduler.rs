@@ -31,11 +31,14 @@ where
     }
 
     pub async fn run(&self, mut pod_queue: Receiver<KubeObject>) -> Result<()> {
+        tracing::info!("scheduler started");
+
         while let Some(pod) = pod_queue.recv().await {
             tracing::info!("schedule pod: {}", pod.name());
             let node = (self.algorithm)(&pod, &self.cache);
             self.bind(pod, node).await?;
         }
+
         Ok(())
     }
 
@@ -49,14 +52,23 @@ where
                 target: node,
             }),
         };
-        let _ = self
+
+        let res = self
             .client
             .post("http://localhost:8080/api/v1/bindings")
             .json(&binding)
             .send()
-            .await?
-            .json::<models::Response<()>>()
             .await?;
+
+        if let Err(err) = res.error_for_status_ref() {
+            let err_res = res.json::<models::ErrResponse>().await?;
+            tracing::error!(
+                "status {}, msg: {}, cause: {}",
+                err.status().unwrap_or_default(),
+                err_res.msg,
+                err_res.cause.unwrap_or_else(|| "None".to_string())
+            );
+        }
 
         Ok(())
     }

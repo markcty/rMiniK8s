@@ -18,8 +18,6 @@ async fn main() -> Result<()> {
     let sched = Scheduler::new(algorithm::dummy::dummy, cache);
     let scheduler_handle = tokio::spawn(async move { sched.run(pod_rx).await });
 
-    tracing::info!("scheduler started");
-
     scheduler_handle.await?.expect("scheduler failed.");
     pod_informer_handler.await?.expect("pod informer failed.");
     node_informer_handler.await?
