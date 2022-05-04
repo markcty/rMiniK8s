@@ -7,3 +7,6 @@ members = [
     "controllers",
     "scheduler",
 ]
+
+[patch.crates-io]
+bollard = { git = 'https://github.com/y-young/bollard' }
