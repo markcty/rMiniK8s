@@ -25,7 +25,6 @@ pub async fn bind(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // check payload
-    #[allow(unused_variables)]
     if let KubeResource::Binding(binding) = &payload.resource {
         let pod_name = payload.name();
         // get pod object
@@ -43,6 +42,10 @@ pub async fn bind(
             // TODO: get the node, and get the address of that node, then set the host_ip according to that.
             status.host_ip = Some("127.0.0.1".to_string());
             pod.status = Some(status);
+
+            let mut spec = pod.spec.clone();
+            spec.node_name = Some(binding.target.name.clone());
+            pod.spec = spec;
         } else {
             tracing::error!("object kind error");
             return Err(ErrResponse::new(

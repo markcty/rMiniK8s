@@ -27,6 +27,10 @@ pub struct PodSpec {
     /// Default to false.
     #[serde(default)]
     pub host_network: bool,
+    /// NodeName is a request to schedule this pod onto a specific node.
+    /// If it is non-empty, the scheduler simply schedules this pod onto that node,
+    /// assuming that it fits resource requirements.
+    pub node_name: Option<String>,
 }
 
 impl PodSpec {
