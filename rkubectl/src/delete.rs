@@ -15,7 +15,7 @@ pub struct Arg {
 impl Arg {
     pub fn handle(&self) -> Result<()> {
         let client = reqwest::blocking::Client::new();
-        let url = gen_url(&self.kind, &self.name)?;
+        let url = gen_url(self.kind.to_owned(), Some(self.name.to_owned()))?;
         let res = client.delete(url).send()?.json::<DeleteRes>()?;
         println!("{}", res.msg);
         Ok(())
