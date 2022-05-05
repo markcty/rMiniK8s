@@ -109,8 +109,8 @@ pub async fn etcd_watch_uri(
     Ok((watcher, stream))
 }
 
-pub fn get_value_str(reponse: GetResponse) -> Result<String, ErrResponse> {
-    if let Some(kv) = reponse.kvs().first() {
+pub fn get_value_str(response: GetResponse) -> Result<String, ErrResponse> {
+    if let Some(kv) = response.kvs().first() {
         let (_, val_str) = kv_to_str(kv)?;
         Ok(val_str)
     } else {
