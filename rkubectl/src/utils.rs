@@ -9,11 +9,8 @@ pub fn gen_url_from_object(object: &KubeObject) -> Result<Url> {
     Ok(url.join(uri.as_str())?)
 }
 
-pub fn gen_url(mut kind: String, name: Option<String>) -> Result<Url> {
+pub fn gen_url(kind: String, name: Option<&String>) -> Result<Url> {
     let url = CONFIG.base_url.to_owned();
-    if !kind.ends_with('s') {
-        kind.push('s');
-    }
     let path = if let Some(name) = name {
         format!("api/v1/{}/{}", kind, name)
     } else {

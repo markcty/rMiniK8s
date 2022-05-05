@@ -4,9 +4,10 @@ extern crate lazy_static;
 use std::env;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{ArgEnum, Parser, Subcommand};
 use reqwest::Url;
 use resources::objects;
+use strum::Display;
 
 mod create;
 mod delete;
@@ -42,6 +43,12 @@ enum Commands {
     Delete(delete::Arg),
     /// Get resources
     Get(get::Arg),
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
+#[strum(serialize_all = "lowercase")]
+enum ResourceKind {
+    Pods,
 }
 
 fn main() -> Result<()> {

@@ -8,12 +8,13 @@ use resources::{
     objects::{KubeObject, KubeResource::Pod},
 };
 
-use crate::utils::gen_url;
+use crate::{utils::gen_url, ResourceKind};
 
 #[derive(Args)]
 pub struct Arg {
     /// Kind of resource
-    kind: String,
+    #[clap(arg_enum)]
+    kind: ResourceKind,
     /// Name of resource
     name: Option<String>,
 }
@@ -21,7 +22,7 @@ pub struct Arg {
 impl Arg {
     pub fn handle(&self) -> Result<()> {
         let client = Client::new();
-        let url = gen_url(self.kind.to_owned(), self.name.to_owned())?;
+        let url = gen_url(self.kind.to_string(), self.name.as_ref())?;
         let res = client
             .get(url)
             .send()?

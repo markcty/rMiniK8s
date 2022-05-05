@@ -1612,6 +1612,7 @@ dependencies = [
  "resources",
  "serde",
  "serde_yaml",
+ "strum",
 ]
 
 [[package]]
