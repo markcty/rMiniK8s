@@ -11,3 +11,6 @@ reqwest = { version = "0.11", features = ["blocking", "json"] }
 anyhow = "1.0.56"
 lazy_static = "1.4.0"
 resources = { path = "../resources" }
+chrono = "0.4.19"
+chrono-humanize = "0.2.1"
+strum = "0.24.0"

@@ -4,12 +4,14 @@ extern crate lazy_static;
 use std::env;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{ArgEnum, Parser, Subcommand};
 use reqwest::Url;
 use resources::objects;
+use strum::Display;
 
 mod create;
 mod delete;
+mod get;
 mod utils;
 
 struct AppConfig {
@@ -20,7 +22,7 @@ lazy_static! {
     static ref CONFIG: AppConfig = AppConfig {
         base_url: match env::var("API_SERVER_URL") {
             Ok(url) => Url::parse(url.as_str()).unwrap(),
-            Err(_) => Url::parse("http://127.0.0.1:8080/api/v1/").unwrap(),
+            Err(_) => Url::parse("http://127.0.0.1:8080/").unwrap(),
         }
     };
 }
@@ -39,6 +41,14 @@ enum Commands {
     Create(create::Arg),
     /// Delete a resource by name.
     Delete(delete::Arg),
+    /// Get resources
+    Get(get::Arg),
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
+#[strum(serialize_all = "lowercase")]
+enum ResourceKind {
+    Pods,
 }
 
 fn main() -> Result<()> {
@@ -47,6 +57,7 @@ fn main() -> Result<()> {
     match &cli.command {
         Commands::Create(arg) => arg.handle()?,
         Commands::Delete(arg) => arg.handle()?,
+        Commands::Get(arg) => arg.handle()?,
     }
 
     Ok(())

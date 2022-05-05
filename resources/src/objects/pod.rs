@@ -3,7 +3,7 @@ use std::{collections::HashMap, default::Default};
 use bollard::models::{ContainerInspectResponse, ContainerStateStatusEnum};
 use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, IntoEnumIterator};
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pod {
@@ -174,7 +174,7 @@ impl Default for PodStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Display)]
 pub enum PodPhase {
     /// All containers in the pod have terminated,
     /// and at least one container has terminated in failure.
