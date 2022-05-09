@@ -1,0 +1,11 @@
+[Unit]
+Description=Flannel CNI Daemon for rMiniK8s
+After=network-online.target firewalld.service containerd.service time-set.target
+Before=kdocker.service
+
+[Service]
+EnvironmentFile=/etc/rminik8s/conf.env
+ExecStart=/usr/local/bin/flanneld --etcd-endpoints=${ETCD_ENDPOINT}
+
+[Install]
+WantedBy=multi-user.target
