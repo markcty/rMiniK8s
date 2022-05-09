@@ -1,4 +1,6 @@
-use std::{collections::HashMap, default::Default, fs::create_dir_all, path::PathBuf};
+use std::{
+    collections::HashMap, default::Default, fs::create_dir_all, net::Ipv4Addr, path::PathBuf,
+};
 
 use anyhow::{Context, Result};
 use bollard::{
@@ -198,7 +200,7 @@ impl Pod {
     /// Update pod status, return true if pod status changed.
     pub async fn update_status(&mut self) -> Result<bool> {
         let response = self.pause_container().inspect().await?;
-        let pod_ip = Pod::get_ip(&response).map(|ip| ip.to_owned());
+        let pod_ip = Pod::get_ip(&response).map(|ip| ip.parse::<Ipv4Addr>().unwrap());
         let containers = self.inspect_containers().await?;
         let phase = self.compute_phase(&containers);
         // TODO: strip uid off container names

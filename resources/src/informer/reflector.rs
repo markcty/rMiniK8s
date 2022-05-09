@@ -49,6 +49,10 @@ impl<T: Object> Reflector<T> {
                             let old = object.clone();
                             drop(object);
 
+                            if old == e.object {
+                                continue;
+                            }
+
                             self.store.insert(e.key.to_owned(), e.object.clone());
                             tx.send(ReflectorNotification::Update(old, e.object))
                                 .await?;

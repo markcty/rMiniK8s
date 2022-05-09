@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Node {
     pub status: NodeStatus,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeStatus {
     /// List of addresses reachable to the node.
@@ -23,7 +23,7 @@ pub enum NodeAddressType {
     InternalIP,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct NodeInfo {
     /// MachineID reported by the node.
     /// For unique machine identification in the cluster this field is preferred.

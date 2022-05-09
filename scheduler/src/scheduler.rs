@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{Ok, Result};
 use resources::{
     models,
@@ -47,6 +49,7 @@ where
             metadata: Metadata {
                 name: pod.name(),
                 uid: pod.metadata.uid,
+                labels: HashMap::new(),
             },
             resource: KubeResource::Binding(Binding {
                 target: node,

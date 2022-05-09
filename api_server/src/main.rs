@@ -66,6 +66,14 @@ async fn main() -> Result<()> {
                     .delete(handler::service::delete),
             ),
     );
+    #[rustfmt::skip]
+        let watch_routes = Router::new().nest(
+        "/watch",
+        Router::new()
+            .route("/nodes", get(handler::node::watch_all))
+            .route("/pods", get(handler::pod::watch_all))
+            .route("/services", get(handler::service::watch_all)),
+    );
 
     let app = Router::new()
         .nest(
@@ -73,10 +81,9 @@ async fn main() -> Result<()> {
             Router::new()
                 .merge(pod_routes)
                 .merge(service_routes)
+                .merge(watch_routes)
                 .route("/nodes", get(handler::node::list))
-                .route("/watch/nodes", get(handler::node::watch_all))
-                .route("/bindings", post(handler::binding::bind))
-                .route("/watch/pods", get(handler::pod::watch_all)),
+                .route("/bindings", post(handler::binding::bind)),
         )
         .layer(Extension(shared_state));
 

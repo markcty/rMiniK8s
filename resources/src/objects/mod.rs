@@ -10,14 +10,14 @@ pub mod object_reference;
 pub mod pod;
 pub mod service;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct KubeObject {
     pub metadata: Metadata,
     #[serde(flatten)]
     pub resource: KubeResource,
 }
 
-#[derive(Debug, Serialize, Deserialize, Display, Clone)]
+#[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq)]
 #[serde(tag = "kind")]
 pub enum KubeResource {
     Pod(pod::Pod),
@@ -26,7 +26,7 @@ pub enum KubeResource {
     Service(service::Service),
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct Metadata {
     /// Name must be unique within a namespace.
     /// Is required when creating resources,
@@ -59,7 +59,9 @@ impl KubeObject {
     }
 }
 
-pub trait Object: Clone + Serialize + DeserializeOwned + Send + Sync + Debug + 'static {
+pub trait Object:
+    Clone + Serialize + DeserializeOwned + Send + Sync + Debug + PartialEq + 'static
+{
     fn uri(&self) -> String;
 }
 

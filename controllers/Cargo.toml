@@ -6,6 +6,9 @@ edition = "2021"
 [[example]]
 name = "dummy-controller"
 
+[[bin]]
+name = "endpoints-controller"
+path = "src/endpoints-controller/main.rs"
 
 [dependencies]
 tokio = { version = "1.17.0", features = ["full"] }

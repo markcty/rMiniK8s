@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::objects::Labels;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Service {
     pub spec: ServiceSpec,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceSpec {
     /// Route service traffic to pods with label keys and values matching this selector.
@@ -23,7 +23,7 @@ pub struct ServiceSpec {
     pub cluster_ip: Option<Ipv4Addr>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServicePort {
     /// The port that will be exposed by this service.
