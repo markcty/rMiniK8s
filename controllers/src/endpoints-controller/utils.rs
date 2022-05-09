@@ -1,3 +1,4 @@
+use resources::models::ErrResponse;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Error, Result};
@@ -148,6 +149,11 @@ pub async fn add_svc_endpoint(
         {
             svc.spec.endpoints.push(pod_ip);
             update_service(svc_ref.value()).await?;
+            tracing::info!(
+                "Add endpoint {} for service {}",
+                pod_ip,
+                svc_ref.metadata.name
+            );
         }
     }
     Ok(())
@@ -179,6 +185,11 @@ pub async fn del_svc_endpoint(
         {
             svc.spec.endpoints.retain(|ip| ip != &pod_ip);
             update_service(svc_ref.value()).await?;
+            tracing::info!(
+                "Remove endpoint {} for service {}",
+                pod_ip,
+                svc_ref.metadata.name
+            );
         }
     }
     Ok(())
@@ -186,12 +197,15 @@ pub async fn del_svc_endpoint(
 
 async fn update_service(svc: &KubeObject) -> Result<()> {
     let client = reqwest::Client::new();
-    client
-        .post(format!("{}{}", "http://localhost:8080", svc.uri()))
+    let res = client
+        .put(format!("{}{}", "http://localhost:8080", svc.uri()))
         .json(svc)
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
+    if res.error_for_status_ref().is_err() {
+        let res = res.json::<ErrResponse>().await?;
+        tracing::error!("Error update service: {}", res.msg);
+    }
     Ok(())
 }
 
@@ -200,7 +214,7 @@ pub async fn add_enpoints(
     mut svc: KubeObject,
 ) -> Result<()> {
     let mut svc_changed = false;
-    if let Service(ref mut svc) = svc.resource {
+    if let Service(ref mut svc_res) = svc.resource {
         for pod in pod_store.iter_mut() {
             let pod_ip = if let Pod(pod) = &pod.resource {
                 if let Some(ip) = pod.get_ip() {
@@ -212,9 +226,10 @@ pub async fn add_enpoints(
                 continue;
             };
 
-            if selector_match(&svc.spec.selector, &pod.metadata.labels) {
+            if selector_match(&svc_res.spec.selector, &pod.metadata.labels) {
                 svc_changed = true;
-                svc.spec.endpoints.push(pod_ip);
+                svc_res.spec.endpoints.push(pod_ip);
+                tracing::info!("Add endpoint {} for service {}", pod_ip, svc.metadata.name);
             }
         }
     }

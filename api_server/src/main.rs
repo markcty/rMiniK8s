@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
-        let service_routes = Router::new().nest(
+    let service_routes = Router::new().nest(
         "/services",
         Router::new()
             .route("/", get(handler::service::list))
@@ -63,6 +63,7 @@ async fn main() -> Result<()> {
                 "/:name",
                 post(handler::service::create)
                     .get(handler::service::get)
+                    .put(handler::service::update)
                     .delete(handler::service::delete),
             ),
     );

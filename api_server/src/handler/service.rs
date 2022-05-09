@@ -48,6 +48,25 @@ pub async fn create(
 }
 
 #[debug_handler]
+pub async fn update(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(payload): Json<KubeObject>,
+) -> HandlerResult<()> {
+    // TODO: validate payload
+    if let KubeResource::Service(_) = payload.resource {
+        etcd_put(&app_state, payload.uri(), &payload).await?;
+        let res = Response::new(Some(format!("service/{} updated", payload.name())), None);
+        Ok(Json(res))
+    } else {
+        // TODO: fill business logic and error handling
+        return Err(ErrResponse::new(
+            String::from("Error creating service"),
+            Some(format!("Expecting service, got {}", payload.kind())),
+        ));
+    }
+}
+
+#[debug_handler]
 pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> HandlerResult<Vec<KubeObject>> {
