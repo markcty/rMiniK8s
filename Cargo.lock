@@ -55,6 +55,7 @@ dependencies = [
  "axum",
  "axum-macros",
  "config",
+ "dashmap",
  "deadpool",
  "etcd-client",
  "futures",

@@ -17,8 +17,19 @@ pub async fn create(
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::Service(_) = payload.resource {
+    if let KubeResource::Service(ref mut service) = payload.resource {
         payload.metadata.uid = Some(Uuid::new_v4());
+
+        if let Some(ip) = service.spec.cluster_ip {
+            if app_state.service_ip_pool.contains(&ip) {
+                return Err(ErrResponse::new(
+                    "ClusterIp exists, try assign a new ClusterIP".to_string(),
+                    None,
+                ));
+            }
+        } else {
+            service.spec.cluster_ip = Some(gen_service_ip(&app_state));
+        }
 
         etcd_put(&app_state, payload.uri(), &payload).await?;
         let res = Response::new(Some(format!("service/{} created", payload.name())), None);

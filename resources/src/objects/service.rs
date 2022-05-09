@@ -10,6 +10,7 @@ pub struct Service {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ServiceSpec {
     /// Route service traffic to pods with label keys and values matching this selector.
     pub selector: Labels,
@@ -18,6 +19,8 @@ pub struct ServiceSpec {
     /// a collection of endpoints that implement the actual service
     #[serde(default)]
     pub endpoints: Vec<Ipv4Addr>,
+    /// clusterIP is the IP address of the service and is usually assigned randomly
+    pub cluster_ip: Option<Ipv4Addr>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

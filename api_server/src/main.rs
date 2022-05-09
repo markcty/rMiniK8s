@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use anyhow::{Context, Result};
 use axum::{
@@ -6,6 +6,7 @@ use axum::{
     Extension, Router,
 };
 use config::Config;
+use dashmap::DashSet;
 use etcd::EtcdConfig;
 use serde::Deserialize;
 
@@ -20,6 +21,7 @@ struct ServerConfig {
 
 pub struct AppState {
     etcd_pool: etcd::EtcdPool,
+    service_ip_pool: DashSet<Ipv4Addr>,
 }
 
 #[tokio::main]
@@ -98,6 +100,7 @@ impl AppState {
 
         Ok(AppState {
             etcd_pool: pool,
+            service_ip_pool: DashSet::new(),
         })
     }
 }

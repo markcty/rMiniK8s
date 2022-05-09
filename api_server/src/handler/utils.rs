@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -130,4 +130,15 @@ pub fn unique_pod_name(name: &str) -> String {
         .collect::<String>()
         .to_lowercase();
     format!("{}-{}", name, suffix)
+}
+
+pub fn gen_service_ip(app_state: &Arc<AppState>) -> Ipv4Addr {
+    let mut rng = thread_rng();
+    loop {
+        let ip = Ipv4Addr::new(172, rng.gen_range(16..32), rng.gen(), rng.gen());
+        if !app_state.service_ip_pool.contains(&ip) {
+            app_state.service_ip_pool.insert(ip.clone());
+            return ip;
+        }
+    }
 }
