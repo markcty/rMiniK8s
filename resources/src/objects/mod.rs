@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use strum::Display;
@@ -8,6 +8,7 @@ pub mod binding;
 pub mod node;
 pub mod object_reference;
 pub mod pod;
+pub mod service;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KubeObject {
@@ -22,6 +23,7 @@ pub enum KubeResource {
     Pod(pod::Pod),
     Binding(binding::Binding),
     Node(node::Node),
+    Service(service::Service),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -39,7 +41,14 @@ pub struct Metadata {
     /// and is not allowed to change on PUT operations.
     /// Populated by the system. Read-only.
     pub uid: Option<Uuid>,
+    /// Map of string keys and values that can be used to organize
+    /// and categorize (scope and select) objects.
+    /// May match selectors of replication controllers and services.
+    #[serde(default)]
+    pub labels: Labels,
 }
+
+pub type Labels = HashMap<String, String>;
 
 impl KubeObject {
     pub fn kind(&self) -> String {
@@ -56,6 +65,10 @@ pub trait Object: Clone + Serialize + DeserializeOwned + Send + Sync + Debug + '
 
 impl Object for KubeObject {
     fn uri(&self) -> String {
-        format!("/api/v1/{}s/{}", self.kind(), self.name())
+        format!(
+            "/api/v1/{}s/{}",
+            self.kind().to_lowercase(),
+            self.name().to_lowercase()
+        )
     }
 }

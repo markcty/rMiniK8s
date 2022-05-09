@@ -6,6 +6,7 @@ pub mod binding;
 pub mod node;
 pub mod pod;
 mod response;
+pub mod service;
 mod utils;
 
 impl AppState {

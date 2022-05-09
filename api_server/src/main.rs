@@ -45,11 +45,24 @@ async fn main() -> Result<()> {
         Router::new()
             .route("/", get(handler::pod::list))
             .route("/:name",
-                post(handler::pod::create)
-                .get(handler::pod::get)
-                .put(handler::pod::replace)
-                .delete(handler::pod::delete),
-        ),
+                   post(handler::pod::create)
+                       .get(handler::pod::get)
+                       .put(handler::pod::replace)
+                       .delete(handler::pod::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
+        let service_routes = Router::new().nest(
+        "/services",
+        Router::new()
+            .route("/", get(handler::service::list))
+            .route(
+                "/:name",
+                post(handler::service::create)
+                    .get(handler::service::get)
+                    .delete(handler::service::delete),
+            ),
     );
 
     let app = Router::new()
@@ -57,6 +70,7 @@ async fn main() -> Result<()> {
             "/api/v1",
             Router::new()
                 .merge(pod_routes)
+                .merge(service_routes)
                 .route("/nodes", get(handler::node::list))
                 .route("/watch/nodes", get(handler::node::watch_all))
                 .route("/bindings", post(handler::binding::bind))
