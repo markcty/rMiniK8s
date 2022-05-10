@@ -23,10 +23,10 @@ docker
 
 ### Node
 
-在部署node之前需要保证ETCD中写入以下规则：
+在部署node之前需要保证ETCD中写入以下规则，并且启用v2 API（在ETCD启动参数中加入–enable-v2）：
 
 ```shell
-etcdctl set /coreos.com/network/config '{ "Network": "10.5.0.0/16", "Backend": {"Type": "vxlan"}}'
+ETCDCTL_API=2 etcdctl set /coreos.com/network/config '{ "Network": "10.5.0.0/16", "Backend": {"Type": "vxlan"}}'
 ```
 
 建议使用multipass起虚拟机来测试，启动带docker的multipass：
@@ -39,7 +39,8 @@ multipass shell k8s1
 在虚拟机中运行以下命令部署node，其间会要求输入配置：
 
 ```shell
-source <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy.sh)
+# please run in root
+bash <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy.sh)
 ```
 
 ## Resources
