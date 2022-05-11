@@ -1,10 +1,9 @@
 use std::{net::Ipv4Addr, sync::Arc};
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Ok, Result};
 use dashmap::DashMap;
-use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, WsStream},
+    informer::{EventHandler, Informer, ListerWatcher},
     models,
     models::ErrResponse,
     objects::{
@@ -17,7 +16,7 @@ use resources::{
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
 
-use crate::{Notification, PodNtf, ServiceNtf};
+use crate::{Notification, PodNtf, ServiceNtf, CONFIG};
 
 pub fn create_services_informer(
     tx: Sender<Notification>,
@@ -25,19 +24,20 @@ pub fn create_services_informer(
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/services")
+                let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/services")?)
                     .await?
                     .json::<models::Response<Vec<KubeObject>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok(res)
             })
         }),
         watcher: Box::new(|_| {
             Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/services")?;
+                let mut url = CONFIG.api_server_endpoint.join("/api/v1/watch/services")?;
+                url.set_scheme("ws").ok();
                 let (stream, _) = connect_async(url).await?;
-                Ok::<WsStream, Error>(stream)
+                Ok(stream)
             })
         }),
     };
@@ -69,19 +69,20 @@ pub fn create_pods_informer(
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/pods")
+                let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/pods")?)
                     .await?
                     .json::<models::Response<Vec<KubeObject>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok(res)
             })
         }),
         watcher: Box::new(|_| {
             Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/pods")?;
+                let mut url = CONFIG.api_server_endpoint.join("/api/v1/watch/pods")?;
+                url.set_scheme("ws").ok();
                 let (stream, _) = connect_async(url).await?;
-                Ok::<WsStream, Error>(stream)
+                Ok(stream)
             })
         }),
     };
@@ -198,7 +199,7 @@ pub async fn del_svc_endpoint(
 async fn update_service(svc: &KubeObject) -> Result<()> {
     let client = reqwest::Client::new();
     let res = client
-        .put(format!("{}{}", "http://localhost:8080", svc.uri()))
+        .put(CONFIG.api_server_endpoint.join(svc.uri().as_str())?)
         .json(svc)
         .send()
         .await?;

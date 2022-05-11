@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Ok};
 use dashmap::DashMap;
-use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher},
     models::Response,
@@ -11,7 +10,7 @@ use resources::{
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
 
-use crate::Notification;
+use crate::{Notification, CONFIG};
 
 pub fn create_services_informer(
     tx: Sender<Notification>,
@@ -19,7 +18,7 @@ pub fn create_services_informer(
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/services")
+                let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/services")?)
                     .await?
                     .json::<Response<Vec<KubeObject>>>()
                     .await?;
@@ -29,7 +28,8 @@ pub fn create_services_informer(
         }),
         watcher: Box::new(|_| {
             Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/services")?;
+                let mut url = CONFIG.api_server_endpoint.join("/api/v1/watch/services")?;
+                url.set_scheme("ws").ok();
                 let (stream, _) = connect_async(url).await?;
                 Ok(stream)
             })

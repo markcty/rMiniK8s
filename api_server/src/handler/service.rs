@@ -86,7 +86,7 @@ pub async fn get(
     let service = etcd_get_object(
         &app_state,
         format!("/api/v1/services/{}", name),
-        Some("Service"),
+        Some("service"),
     )
     .await?;
     let res = Response::new(None, Some(service));

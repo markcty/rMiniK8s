@@ -72,9 +72,9 @@ impl Arg {
                         println!(
                             "{: <20} {: <16} {: <20} {:<}",
                             object.metadata.name,
-                            svc.spec
-                                .cluster_ip
-                                .ok_or_else(|| anyhow!("Service should always has a cluster ip"))?,
+                            svc.spec.cluster_ip.ok_or_else(|| anyhow!(
+                                "Service should always have a cluster IP"
+                            ))?,
                             ports,
                             eps
                         );

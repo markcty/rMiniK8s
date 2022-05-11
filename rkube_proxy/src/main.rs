@@ -1,6 +1,12 @@
+#[macro_use]
+extern crate lazy_static;
+
+use std::env;
+
 use anyhow::Result;
 use k8s_iptables::K8sIpTables;
-use resources::objects::KubeObject;
+use reqwest::Url;
+use resources::{models::NodeConfig, objects::KubeObject};
 use tokio::sync::mpsc;
 
 use crate::utils::create_services_informer;
@@ -13,6 +19,22 @@ pub enum Notification {
     Add(KubeObject),
     Update(KubeObject, KubeObject),
     Delete(KubeObject),
+}
+
+lazy_static! {
+    static ref CONFIG: NodeConfig = {
+        dotenv::from_path("/etc/rminik8s/node.env").ok();
+        NodeConfig {
+            etcd_endpoint: match env::var("ETCD_ENDPOING") {
+                Ok(url) => Url::parse(url.as_str()).unwrap(),
+                Err(_) => Url::parse("http://127.0.0.1:2379/").unwrap(),
+            },
+            api_server_endpoint: match env::var("API_SERVER_ENDPOINT") {
+                Ok(url) => Url::parse(url.as_str()).unwrap(),
+                Err(_) => Url::parse("http://127.0.0.1:8080/").unwrap(),
+            },
+        }
+    };
 }
 
 #[tokio::main]

@@ -1,10 +1,30 @@
-use std::sync::Arc;
+#[macro_use]
+extern crate lazy_static;
+
+use std::{env, sync::Arc};
 
 use anyhow::Result;
 use dashmap::DashMap;
-use resources::objects::KubeObject;
+use reqwest::Url;
+use resources::{models::NodeConfig, objects::KubeObject};
 use tokio::sync::mpsc;
 use utils::pod_ip_changed;
+
+lazy_static! {
+    static ref CONFIG: NodeConfig = {
+        dotenv::from_path("/etc/rminik8s/node.env").ok();
+        NodeConfig {
+            etcd_endpoint: match env::var("ETCD_ENDPOING") {
+                Ok(url) => Url::parse(url.as_str()).unwrap(),
+                Err(_) => Url::parse("http://127.0.0.1:2379/").unwrap(),
+            },
+            api_server_endpoint: match env::var("API_SERVER_ENDPOINT") {
+                Ok(url) => Url::parse(url.as_str()).unwrap(),
+                Err(_) => Url::parse("http://127.0.0.1:8080/").unwrap(),
+            },
+        }
+    };
+}
 
 use crate::utils::{
     add_enpoints, add_svc_endpoint, create_pods_informer, create_services_informer,
