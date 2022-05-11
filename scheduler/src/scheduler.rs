@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::{Ok, Result};
 use resources::{
     models,

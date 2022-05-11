@@ -47,8 +47,6 @@ pub struct Metadata {
     pub labels: Labels,
 }
 
-pub type Labels = HashMap<String, String>;
-
 impl KubeObject {
     pub fn kind(&self) -> String {
         self.resource.to_string().to_lowercase()
@@ -74,7 +72,7 @@ impl Object for KubeObject {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct Labels(pub HashMap<String, String>);
 
 impl ToString for Labels {

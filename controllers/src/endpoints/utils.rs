@@ -11,7 +11,6 @@ use resources::{
         KubeResource::{Pod, Service},
         Object,
     },
-    utils::selector_match,
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
@@ -145,8 +144,7 @@ pub async fn add_svc_endpoint(
             continue;
         };
 
-        if selector_match(&svc.spec.selector, &pod.metadata.labels)
-            && !svc.spec.endpoints.contains(&pod_ip)
+        if svc.spec.selector.matches(&pod.metadata.labels) && !svc.spec.endpoints.contains(&pod_ip)
         {
             svc.spec.endpoints.push(pod_ip);
             update_service(svc_ref.value()).await?;
@@ -181,9 +179,7 @@ pub async fn del_svc_endpoint(
             continue;
         };
 
-        if selector_match(&svc.spec.selector, &pod.metadata.labels)
-            && svc.spec.endpoints.contains(&pod_ip)
-        {
+        if svc.spec.selector.matches(&pod.metadata.labels) && svc.spec.endpoints.contains(&pod_ip) {
             svc.spec.endpoints.retain(|ip| ip != &pod_ip);
             update_service(svc_ref.value()).await?;
             tracing::info!(
@@ -223,7 +219,7 @@ pub async fn add_enpoints(
                 continue;
             };
 
-            if selector_match(&svc_res.spec.selector, &pod.metadata.labels) {
+            if svc_res.spec.selector.matches(&pod.metadata.labels) {
                 svc_changed = true;
                 svc_res.spec.endpoints.push(pod_ip);
                 tracing::info!("Add endpoint {} for service {}", pod_ip, svc.metadata.name);

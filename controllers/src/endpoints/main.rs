@@ -14,7 +14,7 @@ lazy_static! {
     static ref CONFIG: NodeConfig = {
         dotenv::from_path("/etc/rminik8s/node.env").ok();
         NodeConfig {
-            etcd_endpoint: match env::var("ETCD_ENDPOING") {
+            etcd_endpoint: match env::var("ETCD_ENDPOINT") {
                 Ok(url) => Url::parse(url.as_str()).unwrap(),
                 Err(_) => Url::parse("http://127.0.0.1:2379/").unwrap(),
             },
