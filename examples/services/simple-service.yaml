@@ -1,9 +1,9 @@
 kind: Service
 metadata:
-  name: nginx-service
+  name: server-service
 spec:
   selector:
-    app: nginx
+    app: server
   ports:
     - port: 80
-      targetPort: 9376
+      targetPort: 80

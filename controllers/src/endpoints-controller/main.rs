@@ -4,6 +4,7 @@ use anyhow::Result;
 use dashmap::DashMap;
 use resources::objects::KubeObject;
 use tokio::sync::mpsc;
+use utils::pod_ip_changed;
 
 use crate::utils::{
     add_enpoints, add_svc_endpoint, create_pods_informer, create_services_informer,
@@ -33,6 +34,7 @@ pub enum ServiceNtf {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+    tracing::info!("Endpoints controller started");
 
     let (tx, mut rx) = mpsc::channel::<Notification>(16);
 
@@ -65,8 +67,10 @@ async fn handle_notification(
                 add_svc_endpoint(svc_store.to_owned(), new).await?;
             },
             PodNtf::Update(old, new) => {
-                del_svc_endpoint(svc_store.to_owned(), old).await?;
-                add_svc_endpoint(svc_store.to_owned(), new).await?;
+                if pod_ip_changed(&old, &new) {
+                    del_svc_endpoint(svc_store.to_owned(), old).await?;
+                    add_svc_endpoint(svc_store.to_owned(), new).await?;
+                }
             },
             PodNtf::Delete(old) => {
                 del_svc_endpoint(svc_store.to_owned(), old).await?;

@@ -1,5 +1,4 @@
-use resources::models::ErrResponse;
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use anyhow::{anyhow, Error, Result};
 use dashmap::DashMap;
@@ -7,6 +6,7 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, WsStream},
     models,
+    models::ErrResponse,
     objects::{
         KubeObject,
         KubeResource::{Pod, Service},
@@ -89,7 +89,7 @@ pub fn create_pods_informer(
     // create event handler closures
     let tx_add = tx.clone();
     let tx_update = tx.clone();
-    let tx_delete = tx.clone();
+    let tx_delete = tx;
     let eh = EventHandler {
         add_cls: Box::new(move |new| {
             let tx_add = tx_add.clone();
@@ -216,12 +216,8 @@ pub async fn add_enpoints(
     let mut svc_changed = false;
     if let Service(ref mut svc_res) = svc.resource {
         for pod in pod_store.iter_mut() {
-            let pod_ip = if let Pod(pod) = &pod.resource {
-                if let Some(ip) = pod.get_ip() {
-                    ip
-                } else {
-                    continue;
-                }
+            let pod_ip = if let Some(ip) = get_pod_ip(pod.value()) {
+                ip
             } else {
                 continue;
             };
@@ -238,4 +234,18 @@ pub async fn add_enpoints(
         update_service(&svc).await?
     }
     Ok(())
+}
+
+fn get_pod_ip(pod: &KubeObject) -> Option<Ipv4Addr> {
+    if let Pod(pod) = &pod.resource {
+        Some(pod.get_ip()).flatten()
+    } else {
+        None
+    }
+}
+
+pub fn pod_ip_changed(pod1: &KubeObject, pod2: &KubeObject) -> bool {
+    let pod_ip1 = get_pod_ip(pod1);
+    let pod_ip2 = get_pod_ip(pod2);
+    pod_ip1 != pod_ip2
 }

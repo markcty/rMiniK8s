@@ -6,6 +6,7 @@ members = [
     "resources",
     "controllers",
     "scheduler",
+    "rkube-proxy",
 ]
 
 [patch.crates-io]

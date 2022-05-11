@@ -141,7 +141,7 @@ pub fn gen_service_ip(app_state: &Arc<AppState>) -> Ipv4Addr {
     loop {
         let ip = Ipv4Addr::new(172, rng.gen_range(16..32), rng.gen(), rng.gen());
         if !app_state.service_ip_pool.contains(&ip) {
-            app_state.service_ip_pool.insert(ip.clone());
+            app_state.service_ip_pool.insert(ip);
             return ip;
         }
     }
