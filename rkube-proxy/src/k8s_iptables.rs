@@ -34,7 +34,7 @@ impl ServiceTable {
             lb.add_ep(ep);
         }
 
-        tracing::info!("Add endpoint {} for service {}", self.svc_name, ep);
+        tracing::info!("Add endpoint {} for service {}", ep, self.svc_name);
     }
 
     fn cleanup(self) {
