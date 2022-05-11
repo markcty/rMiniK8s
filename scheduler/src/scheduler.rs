@@ -49,7 +49,7 @@ where
             metadata: Metadata {
                 name: pod.name(),
                 uid: pod.metadata.uid,
-                labels: HashMap::new(),
+                labels: pod.metadata.labels,
             },
             resource: KubeResource::Binding(Binding {
                 target: node,
