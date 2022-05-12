@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -63,7 +63,11 @@ pub async fn etcd_get_objects_by_prefix(
             if object.kind() == kind {
                 objects.push(object);
             } else {
-                tracing::error!("There are some errors with the kind of objects");
+                tracing::error!(
+                    "Object kind error: expected {}, found: {}",
+                    kind,
+                    object.kind()
+                );
                 return Err(ErrResponse::new(
                     "There are some errors with the kind of objects".to_string(),
                     Some(format!("expected: {}, found: {}", kind, object.kind())),
@@ -130,4 +134,15 @@ pub fn unique_pod_name(name: &str) -> String {
         .collect::<String>()
         .to_lowercase();
     format!("{}-{}", name, suffix)
+}
+
+pub fn gen_service_ip(app_state: &Arc<AppState>) -> Ipv4Addr {
+    let mut rng = thread_rng();
+    loop {
+        let ip = Ipv4Addr::new(172, rng.gen_range(16..32), rng.gen(), rng.gen());
+        if !app_state.service_ip_pool.contains(&ip) {
+            app_state.service_ip_pool.insert(ip);
+            return ip;
+        }
+    }
 }

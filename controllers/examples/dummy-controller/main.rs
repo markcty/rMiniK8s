@@ -11,6 +11,7 @@ use resources::{
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
 
+// noinspection DuplicatedCode
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();

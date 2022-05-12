@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 
 use anyhow::{Context, Result};
 use axum::{
@@ -6,6 +6,7 @@ use axum::{
     Extension, Router,
 };
 use config::Config;
+use dashmap::DashSet;
 use etcd::EtcdConfig;
 use serde::Deserialize;
 
@@ -20,6 +21,7 @@ struct ServerConfig {
 
 pub struct AppState {
     etcd_pool: etcd::EtcdPool,
+    service_ip_pool: DashSet<Ipv4Addr>,
 }
 
 #[tokio::main]
@@ -45,11 +47,33 @@ async fn main() -> Result<()> {
         Router::new()
             .route("/", get(handler::pod::list))
             .route("/:name",
-                post(handler::pod::create)
-                .get(handler::pod::get)
-                .put(handler::pod::replace)
-                .delete(handler::pod::delete),
-        ),
+                   post(handler::pod::create)
+                       .get(handler::pod::get)
+                       .put(handler::pod::replace)
+                       .delete(handler::pod::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
+    let service_routes = Router::new().nest(
+        "/services",
+        Router::new()
+            .route("/", get(handler::service::list))
+            .route(
+                "/:name",
+                post(handler::service::create)
+                    .get(handler::service::get)
+                    .put(handler::service::update)
+                    .delete(handler::service::delete),
+            ),
+    );
+    #[rustfmt::skip]
+        let watch_routes = Router::new().nest(
+        "/watch",
+        Router::new()
+            .route("/nodes", get(handler::node::watch_all))
+            .route("/pods", get(handler::pod::watch_all))
+            .route("/services", get(handler::service::watch_all)),
     );
 
     let app = Router::new()
@@ -57,10 +81,10 @@ async fn main() -> Result<()> {
             "/api/v1",
             Router::new()
                 .merge(pod_routes)
+                .merge(service_routes)
+                .merge(watch_routes)
                 .route("/nodes", get(handler::node::list))
-                .route("/watch/nodes", get(handler::node::watch_all))
-                .route("/bindings", post(handler::binding::bind))
-                .route("/watch/pods", get(handler::pod::watch_all)),
+                .route("/bindings", post(handler::binding::bind)),
         )
         .layer(Extension(shared_state));
 
@@ -84,6 +108,7 @@ impl AppState {
 
         Ok(AppState {
             etcd_pool: pool,
+            service_ip_pool: DashSet::new(),
         })
     }
 }

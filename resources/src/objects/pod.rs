@@ -1,17 +1,17 @@
-use std::{collections::HashMap, default::Default};
+use std::{collections::HashMap, default::Default, net::Ipv4Addr};
 
 use bollard::models::{ContainerInspectResponse, ContainerStateStatusEnum};
 use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pod {
     pub spec: PodSpec,
     pub status: Option<PodStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PodSpec {
     /// List of containers belonging to the pod.
@@ -43,7 +43,7 @@ impl PodSpec {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Container {
     /// Name of the container specified as a DNS_LABEL.
@@ -67,7 +67,7 @@ pub struct Container {
     pub resources: ResourceRequirements,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerPort {
     /// Number of port to expose on the pod's IP address.
@@ -75,7 +75,7 @@ pub struct ContainerPort {
     pub container_port: u16,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct VolumeMount {
     /// Path within the container at which the volume should be mounted.
@@ -84,13 +84,13 @@ pub struct VolumeMount {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct ResourceRequirements {
     /// Limits describes the maximum amount of compute resources allowed.
     pub limits: Resource,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
 pub struct Resource {
     /// An integer value representing this container's
@@ -109,7 +109,7 @@ impl Default for Resource {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Volume {
     /// Volume's name.
     /// Must be a DNS_LABEL and unique within the pod.
@@ -118,7 +118,7 @@ pub struct Volume {
     pub config: VolumeConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum VolumeConfig {
     /// HostPath represents a pre-existing file
@@ -149,7 +149,7 @@ pub struct PodStatus {
     /// Routable at least within the cluster.
     /// Empty if not yet allocated.
     #[serde(rename = "podIP")]
-    pub pod_ip: Option<String>,
+    pub pod_ip: Option<Ipv4Addr>,
     /// Current service state of pod.
     pub conditions: HashMap<PodConditionType, PodCondition>,
     /// The list has one entry per container in the manifest.
@@ -265,5 +265,16 @@ impl From<ContainerInspectResponse> for ContainerStatus {
             container_id: response.id.expect("Container ID not found"),
             state: ContainerState::from(response.state),
         }
+    }
+}
+
+impl Pod {
+    pub fn get_ip(&self) -> Option<Ipv4Addr> {
+        if let Some(status) = &self.status {
+            if let Some(ip) = &status.pod_ip {
+                return Some(ip.to_owned());
+            }
+        }
+        None
     }
 }

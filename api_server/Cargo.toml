@@ -21,3 +21,4 @@ axum-macros = "0.2.0"
 futures = "0.3.21"
 uuid = { version = "0.8", features = ["v4"] }
 rand = "0.8.5"
+dashmap = "5.2.0"

@@ -1,4 +1,5 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 pub mod etcd;
@@ -15,6 +16,11 @@ pub struct ErrResponse {
     pub cause: Option<String>,
     #[serde(skip)]
     pub status: StatusCode,
+}
+
+pub struct NodeConfig {
+    pub etcd_endpoint: Url,
+    pub api_server_endpoint: Url,
 }
 
 impl<T> Response<T>

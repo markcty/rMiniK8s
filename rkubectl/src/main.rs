@@ -49,6 +49,7 @@ enum Commands {
 #[strum(serialize_all = "lowercase")]
 enum ResourceKind {
     Pods,
+    Services,
 }
 
 fn main() -> Result<()> {

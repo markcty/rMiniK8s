@@ -1,0 +1,9 @@
+kind: Service
+metadata:
+  name: server-service
+spec:
+  selector:
+    app: server
+  ports:
+    - port: 80
+      targetPort: 80
