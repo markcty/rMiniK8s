@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use actix::{prelude::*, Actor};
+use anyhow::{Context, Result};
 use dashmap::DashMap;
 use futures_util::future::BoxFuture;
 use reflector::{Reflector, ReflectorNotification};
@@ -22,19 +23,23 @@ pub struct ListerWatcher<T> {
     pub watcher: CLS<(), WsStream>,
 }
 
-pub struct EventHandler<T> {
-    pub add_cls: CLS<T, ()>,
-    pub update_cls: CLS<(T, T), ()>,
-    pub delete_cls: CLS<T, ()>,
+pub trait EventHandler<T>: Actor + Handler<Event<T>> {}
+
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub enum Event<T> {
+    Add(T),
+    Update(T, T),
+    Delete(T),
 }
 
-pub struct Informer<T> {
+pub struct Informer<T, H: EventHandler<T>> {
     reflector: Arc<Reflector<T>>,
-    eh: EventHandler<T>,
+    eh: Addr<H>,
 }
 
-impl<T: Object> Informer<T> {
-    pub fn new(lw: ListerWatcher<T>, eh: EventHandler<T>, store: Arc<Store<T>>) -> Self {
+impl<T: Object, H: EventHandler<T>> Informer<T, H> {
+    pub fn new(lw: ListerWatcher<T>, eh: Addr<H>, store: Arc<Store<T>>) -> Self {
         let reflector = Reflector {
             lw,
             store,
@@ -45,7 +50,10 @@ impl<T: Object> Informer<T> {
         }
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&self) -> Result<()>
+    where
+        <H as actix::Actor>::Context: actix::dev::ToEnvelope<H, Event<T>>,
+    {
         // start reflector
         let (tx, mut rx) = mpsc::channel::<ReflectorNotification<T>>(16);
         let r = self.reflector.clone();
@@ -53,17 +61,15 @@ impl<T: Object> Informer<T> {
 
         tracing::info!("Informer started");
         while let Some(n) = rx.recv().await {
-            match n {
-                ReflectorNotification::Add(new) => {
-                    (self.eh.add_cls)(new).await?;
-                },
-                ReflectorNotification::Update(old, new) => {
-                    (self.eh.update_cls)((old, new)).await?;
-                },
-                ReflectorNotification::Delete(old) => {
-                    (self.eh.delete_cls)(old).await?;
-                },
-            }
+            let msg = match n {
+                ReflectorNotification::Add(new) => Event::Add(new),
+                ReflectorNotification::Update(old, new) => Event::Update(old, new),
+                ReflectorNotification::Delete(old) => Event::Delete(old),
+            };
+            self.eh
+                .send(msg)
+                .await?
+                .with_context(|| "EventHandler error")?;
         }
 
         reflector_handle.await?

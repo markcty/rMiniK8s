@@ -1,14 +1,18 @@
 use std::sync::Arc;
 
+use actix::{prelude::*, Actor};
 use anyhow::{anyhow, Error, Result};
 use dashmap::DashMap;
 use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, WsStream},
+    informer::{Event, EventHandler, Informer, ListerWatcher, WsStream},
     models::Response,
     objects::KubeObject,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{
+    mpsc::{self, Sender},
+    Mutex,
+};
 use tokio_tungstenite::connect_async;
 
 use crate::{
@@ -25,7 +29,42 @@ mod pod_worker;
 mod status_manager;
 mod volume;
 
-#[tokio::main]
+struct PodUpdateHandler {
+    tx: Arc<Sender<PodUpdate>>,
+}
+
+impl Actor for PodUpdateHandler {
+    type Context = Context<Self>;
+}
+
+impl Handler<Event<KubeObject>> for PodUpdateHandler {
+    type Result = Result<()>;
+
+    fn handle(&mut self, msg: Event<KubeObject>, ctx: &mut Self::Context) -> Self::Result {
+        let tx = self.tx.clone();
+        let future = Box::pin(async move {
+            let message = match msg {
+                Event::Add(pod) => PodUpdate::Add(pod),
+                Event::Update(_old_pod, new_pod) => PodUpdate::Update(new_pod),
+                Event::Delete(old_pod) => PodUpdate::Delete(old_pod),
+            };
+            let result = tx.send(message).await;
+            match result {
+                Ok(_) => (),
+                Err(e) => {
+                    tracing::error!("Failed to send message: {}", e);
+                },
+            }
+        })
+        .into_actor(self);
+        ctx.spawn(future);
+        Ok(())
+    }
+}
+
+impl EventHandler<KubeObject> for PodUpdateHandler {}
+
+#[actix_rt::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("rKubelet started");
@@ -53,36 +92,11 @@ async fn main() -> Result<()> {
     };
 
     // Create work queue and register event handler closures
-    let (tx_add, rx) = mpsc::channel::<PodUpdate>(16);
-    let tx_update = tx_add.clone();
-    let tx_delete = tx_add.clone();
-    let eh = EventHandler::<KubeObject> {
-        add_cls: Box::new(move |pod| {
-            // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
-            let tx_add = tx_add.clone();
-            Box::pin(async move {
-                let message = PodUpdate::Add(pod);
-                tx_add.send(message).await?;
-                Ok(())
-            })
-        }),
-        update_cls: Box::new(move |(_old_pod, new_pod)| {
-            let tx_update = tx_update.clone();
-            Box::pin(async move {
-                let message = PodUpdate::Update(new_pod);
-                tx_update.send(message).await?;
-                Ok(())
-            })
-        }),
-        delete_cls: Box::new(move |old_pod| {
-            let tx_delete = tx_delete.clone();
-            Box::pin(async move {
-                let message = PodUpdate::Delete(old_pod);
-                tx_delete.send(message).await?;
-                Ok(())
-            })
-        }),
-    };
+    let (tx, rx) = mpsc::channel::<PodUpdate>(16);
+    let eh = PodUpdateHandler {
+        tx: Arc::new(tx),
+    }
+    .start();
 
     // Start the informer
     let store = Arc::new(DashMap::new());
