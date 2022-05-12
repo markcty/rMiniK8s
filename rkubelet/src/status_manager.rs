@@ -53,7 +53,7 @@ impl StatusManager {
         client
             .put(format!(
                 "{}/api/v1/pods/{}",
-                CONFIG.api_server_url,
+                CONFIG.cluster.api_server_url,
                 pod.metadata().name
             ))
             .json(&payload)

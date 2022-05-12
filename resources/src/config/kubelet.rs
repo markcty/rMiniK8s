@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::ClusterConfig;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase", default)]
 pub struct KubeletConfig {
@@ -19,10 +21,7 @@ pub struct KubeletConfig {
     /// Frequency that kubelet computes pod status.
     /// In seconds. Default: 10 sec
     pub pod_status_update_frequency: u64,
-    /// API server URL
-    pub api_server_url: String,
-    /// API server watch URL
-    pub api_server_watch_url: String,
+    pub cluster: ClusterConfig,
 }
 
 impl Default for KubeletConfig {
@@ -32,8 +31,7 @@ impl Default for KubeletConfig {
             node_status_update_frequency: 10,
             node_status_report_frequency: 300,
             pod_status_update_frequency: 10,
-            api_server_url: "http://localhost:8080".to_string(),
-            api_server_watch_url: "ws://localhost:8080".to_string(),
+            cluster: ClusterConfig::default(),
         }
     }
 }

@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     let lw = ListerWatcher {
         lister: Box::new(move |_| {
             Box::pin(async {
-                let res = reqwest::get(format!("{}/api/v1/pods", CONFIG.api_server_url))
+                let res = reqwest::get(format!("{}/api/v1/pods", CONFIG.cluster.api_server_url))
                     .await?
                     .json::<Response<Vec<KubeObject>>>()
                     .await?;
@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
         watcher: Box::new(|_| {
             Box::pin(async {
                 let url = Url::parse(
-                    format!("{}/api/v1/watch/pods", CONFIG.api_server_watch_url).as_str(),
+                    format!("{}/api/v1/watch/pods", CONFIG.cluster.api_server_watch_url).as_str(),
                 )?;
                 let (stream, _) = connect_async(url).await?;
                 Ok::<WsStream, Error>(stream)
