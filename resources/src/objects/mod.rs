@@ -8,6 +8,7 @@ pub mod binding;
 pub mod node;
 pub mod object_reference;
 pub mod pod;
+pub mod replica_set;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KubeObject {
@@ -22,6 +23,7 @@ pub enum KubeResource {
     Pod(pod::Pod),
     Binding(binding::Binding),
     Node(node::Node),
+    ReplicaSet(replica_set::ReplicaSet),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

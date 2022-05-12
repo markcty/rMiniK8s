@@ -5,13 +5,15 @@ use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
+use super::Metadata;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pod {
     pub spec: PodSpec,
     pub status: Option<PodStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PodSpec {
     /// List of containers belonging to the pod.
@@ -266,4 +268,12 @@ impl From<ContainerInspectResponse> for ContainerStatus {
             state: ContainerState::from(response.state),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PodTemplateSpec {
+    /// Standard object's metadata.
+    pub metadata: Metadata,
+    /// Specification of the desired behavior of the pod.
+    pub spec: PodSpec,
 }

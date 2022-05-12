@@ -3,15 +3,21 @@ name = "controllers"
 version = "0.1.0"
 edition = "2021"
 
-[[example]]
-name = "dummy-controller"
+# [[example]]
+# name = "dummy-controller"
 
+[[bin]]
+name = "replicaset-controller"
+path = "src/replica_set/main.rs"
 
 [dependencies]
+actix = "0.13.0"
+actix-rt = "2.7.0"
 tokio = { version = "1.17.0", features = ["full"] }
 resources = { path = "../resources" }
 anyhow = { version = "1.0.56", features = ["backtrace"] }
 reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = { version = "1.0.136", features = ["derive"] }
 tokio-tungstenite = "0.17.1"
 tracing = "0.1.32"
 tracing-subscriber = "0.3.10"
