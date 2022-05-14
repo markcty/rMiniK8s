@@ -125,7 +125,7 @@ pub fn get_value_str(response: GetResponse) -> Result<String, ErrResponse> {
     }
 }
 
-pub fn unique_pod_name(name: &str) -> String {
+pub fn unique_name(name: &str) -> String {
     let mut rng = thread_rng();
     let suffix = (&mut rng)
         .sample_iter(Alphanumeric)

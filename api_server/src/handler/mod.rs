@@ -5,6 +5,7 @@ use crate::{etcd::EtcdClient, AppState};
 pub mod binding;
 pub mod node;
 pub mod pod;
+pub mod replica_set;
 mod response;
 pub mod service;
 mod utils;

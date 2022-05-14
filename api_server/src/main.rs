@@ -55,6 +55,19 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
+    let rs_routes = Router::new().nest(
+        "/replicasets",
+        Router::new()
+            .route("/", get(handler::replica_set::list))
+            .route("/:name",
+                   post(handler::replica_set::create)
+                       .get(handler::replica_set::get)
+                       .put(handler::replica_set::update)
+                       .delete(handler::replica_set::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
     let service_routes = Router::new().nest(
         "/services",
         Router::new()
@@ -73,6 +86,7 @@ async fn main() -> Result<()> {
         Router::new()
             .route("/nodes", get(handler::node::watch_all))
             .route("/pods", get(handler::pod::watch_all))
+            .route("/replicasets", get(handler::replica_set::watch_all))
             .route("/services", get(handler::service::watch_all)),
     );
 
@@ -81,6 +95,7 @@ async fn main() -> Result<()> {
             "/api/v1",
             Router::new()
                 .merge(pod_routes)
+                .merge(rs_routes)
                 .merge(service_routes)
                 .merge(watch_routes)
                 .route("/nodes", get(handler::node::list))
