@@ -7,7 +7,7 @@ use resources::{
     models::Response,
     objects::{
         KubeObject,
-        KubeResource::{Pod, Service},
+        KubeResource::{Pod, ReplicaSet, Service},
     },
 };
 
@@ -44,6 +44,24 @@ impl Arg {
                             object.metadata.name,
                             pod.status.unwrap().phase,
                             d.to_text_en(Accuracy::Rough, Tense::Present)
+                        );
+                    }
+                }
+            },
+            ResourceKind::ReplicaSets => {
+                println!(
+                    "{:<20} {:<8} {:<8} {:<8}",
+                    "NAME", "DESIRED", "CURRENT", "READY"
+                );
+                for object in res.data.unwrap() {
+                    if let ReplicaSet(rs) = object.resource {
+                        let status = rs.status.unwrap_or_default();
+                        println!(
+                            "{:<20} {:<8} {:<8} {:<8}",
+                            object.metadata.name,
+                            rs.spec.replicas,
+                            status.replicas,
+                            status.ready_replicas,
                         );
                     }
                 }
