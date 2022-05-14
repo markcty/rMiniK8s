@@ -5,10 +5,24 @@ use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
+use super::Metadata;
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pod {
     pub spec: PodSpec,
     pub status: Option<PodStatus>,
+}
+
+impl Pod {
+    pub fn is_ready(&self) -> bool {
+        match &self.status {
+            Some(status) => status
+                .conditions
+                .get(&PodConditionType::Ready)
+                .map_or(false, |condition| condition.status),
+            None => false,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -277,4 +291,12 @@ impl Pod {
         }
         None
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct PodTemplateSpec {
+    /// Standard object's metadata.
+    pub metadata: Metadata,
+    /// Specification of the desired behavior of the pod.
+    pub spec: PodSpec,
 }

@@ -4,10 +4,14 @@ use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use strum::Display;
 use uuid::Uuid;
+
+use self::object_reference::ObjectReference;
+
 pub mod binding;
 pub mod node;
 pub mod object_reference;
 pub mod pod;
+pub mod replica_set;
 pub mod service;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -24,9 +28,11 @@ pub enum KubeResource {
     Binding(binding::Binding),
     Node(node::Node),
     Service(service::Service),
+    ReplicaSet(replica_set::ReplicaSet),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Metadata {
     /// Name must be unique within a namespace.
     /// Is required when creating resources,
@@ -46,6 +52,11 @@ pub struct Metadata {
     /// May match selectors of replication controllers and services.
     #[serde(default)]
     pub labels: Labels,
+    /// List of objects depended by this object.
+    /// If ALL objects in the list have been deleted,
+    /// this object will be garbage collected.
+    #[serde(default)]
+    pub owner_references: Vec<ObjectReference>,
 }
 
 impl KubeObject {

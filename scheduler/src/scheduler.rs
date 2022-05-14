@@ -48,6 +48,7 @@ where
                 name: pod.name(),
                 uid: pod.metadata.uid,
                 labels: pod.metadata.labels,
+                ..Default::default()
             },
             resource: KubeResource::Binding(Binding {
                 target: node,
