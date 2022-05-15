@@ -1,9 +1,8 @@
-use std::{net::Ipv4Addr, sync::Arc};
+use std::net::Ipv4Addr;
 
 use anyhow::{anyhow, Ok, Result};
-use dashmap::DashMap;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher},
+    informer::{EventHandler, Informer, ListerWatcher, Store},
     models,
     models::ErrResponse,
     objects::{
@@ -17,9 +16,7 @@ use tokio_tungstenite::connect_async;
 
 use crate::{Notification, PodNtf, ServiceNtf, CONFIG};
 
-pub fn create_services_informer(
-    tx: Sender<Notification>,
-) -> (Informer<KubeObject>, Arc<DashMap<String, KubeObject>>) {
+pub fn create_services_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
@@ -58,13 +55,10 @@ pub fn create_services_informer(
     };
 
     // start the informer
-    let store = Arc::new(DashMap::new());
-    (Informer::new(lw, eh, store.clone()), store)
+    Informer::new(lw, eh)
 }
 
-pub fn create_pods_informer(
-    tx: Sender<Notification>,
-) -> (Informer<KubeObject>, Arc<DashMap<String, KubeObject>>) {
+pub fn create_pods_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
@@ -119,14 +113,10 @@ pub fn create_pods_informer(
     };
 
     // start the informer
-    let store = Arc::new(DashMap::new());
-    (Informer::new(lw, eh, store.clone()), store)
+    Informer::new(lw, eh)
 }
 
-pub async fn add_svc_endpoint(
-    svc_store: Arc<DashMap<String, KubeObject>>,
-    pod: KubeObject,
-) -> Result<()> {
+pub async fn add_svc_endpoint(svc_store: Store<KubeObject>, pod: KubeObject) -> Result<()> {
     let pod_ip = if let Pod(pod) = pod.resource {
         if let Some(ip) = pod.get_ip() {
             ip
@@ -137,7 +127,8 @@ pub async fn add_svc_endpoint(
         return Ok(());
     };
 
-    for mut svc_ref in svc_store.iter_mut() {
+    let mut store = svc_store.write().await;
+    for (_, svc_ref) in store.iter_mut() {
         let svc = if let Service(ref mut svc) = svc_ref.resource {
             svc
         } else {
@@ -147,21 +138,14 @@ pub async fn add_svc_endpoint(
         if svc.spec.selector.matches(&pod.metadata.labels) && !svc.spec.endpoints.contains(&pod_ip)
         {
             svc.spec.endpoints.push(pod_ip);
-            update_service(svc_ref.value()).await?;
-            tracing::info!(
-                "Add endpoint {} for service {}",
-                pod_ip,
-                svc_ref.metadata.name
-            );
+            update_service(svc_ref).await?;
+            tracing::info!("Add endpoint {} for service {}", pod_ip, svc_ref.name());
         }
     }
     Ok(())
 }
 
-pub async fn del_svc_endpoint(
-    svc_store: Arc<DashMap<String, KubeObject>>,
-    pod: KubeObject,
-) -> Result<()> {
+pub async fn del_svc_endpoint(svc_store: Store<KubeObject>, pod: KubeObject) -> Result<()> {
     let pod_ip = if let Pod(pod) = pod.resource {
         if let Some(ip) = pod.get_ip() {
             ip
@@ -172,7 +156,8 @@ pub async fn del_svc_endpoint(
         return Ok(());
     };
 
-    for mut svc_ref in svc_store.iter_mut() {
+    let mut store = svc_store.write().await;
+    for (_, svc_ref) in store.iter_mut() {
         let svc = if let Service(ref mut svc) = svc_ref.resource {
             svc
         } else {
@@ -181,7 +166,7 @@ pub async fn del_svc_endpoint(
 
         if svc.spec.selector.matches(&pod.metadata.labels) && svc.spec.endpoints.contains(&pod_ip) {
             svc.spec.endpoints.retain(|ip| ip != &pod_ip);
-            update_service(svc_ref.value()).await?;
+            update_service(svc_ref).await?;
             tracing::info!(
                 "Remove endpoint {} for service {}",
                 pod_ip,
@@ -206,14 +191,12 @@ async fn update_service(svc: &KubeObject) -> Result<()> {
     Ok(())
 }
 
-pub async fn add_enpoints(
-    pod_store: Arc<DashMap<String, KubeObject>>,
-    mut svc: KubeObject,
-) -> Result<()> {
+pub async fn add_enpoints(pod_store: Store<KubeObject>, mut svc: KubeObject) -> Result<()> {
     let mut svc_changed = false;
     if let Service(ref mut svc_res) = svc.resource {
-        for pod in pod_store.iter_mut() {
-            let pod_ip = if let Some(ip) = get_pod_ip(pod.value()) {
+        let mut store = pod_store.write().await;
+        for (_, pod) in store.iter_mut() {
+            let pod_ip = if let Some(ip) = get_pod_ip(pod) {
                 ip
             } else {
                 continue;

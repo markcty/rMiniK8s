@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
 use anyhow::{anyhow, Ok};
-use dashmap::DashMap;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher},
+    informer::{EventHandler, Informer, ListerWatcher, Store},
     models::Response,
     objects::KubeObject,
 };
@@ -14,7 +11,7 @@ use crate::{Notification, CONFIG};
 
 pub fn create_services_informer(
     tx: Sender<Notification>,
-) -> (Informer<KubeObject>, Arc<DashMap<String, KubeObject>>) {
+) -> (Informer<KubeObject>, Store<KubeObject>) {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
@@ -65,6 +62,7 @@ pub fn create_services_informer(
     };
 
     // start the informer
-    let store = Arc::new(DashMap::new());
-    (Informer::new(lw, eh, store.clone()), store)
+    let informer = Informer::new(lw, eh);
+    let store = informer.get_store();
+    (informer, store)
 }

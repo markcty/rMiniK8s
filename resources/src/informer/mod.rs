@@ -1,10 +1,12 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use dashmap::DashMap;
 use futures_util::future::BoxFuture;
 use reflector::{Reflector, ReflectorNotification};
-use tokio::{net::TcpStream, sync::mpsc};
+use tokio::{
+    net::TcpStream,
+    sync::{mpsc, RwLock},
+};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::objects::Object;
@@ -13,28 +15,29 @@ mod reflector;
 
 pub type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-pub type Store<T> = DashMap<String, T>;
+pub type Store<T> = Arc<RwLock<HashMap<String, T>>>;
 
 pub type CLS<ARG, RES> = Box<dyn Fn(ARG) -> BoxFuture<'static, Result<RES>> + Send + Sync>;
 
-pub struct ListerWatcher<T> {
+pub struct ListerWatcher<T: Object> {
     pub lister: CLS<(), Vec<T>>,
     pub watcher: CLS<(), WsStream>,
 }
 
-pub struct EventHandler<T> {
+pub struct EventHandler<T: Object> {
     pub add_cls: CLS<T, ()>,
     pub update_cls: CLS<(T, T), ()>,
     pub delete_cls: CLS<T, ()>,
 }
 
-pub struct Informer<T> {
+pub struct Informer<T: Object> {
     reflector: Arc<Reflector<T>>,
     eh: EventHandler<T>,
 }
 
 impl<T: Object> Informer<T> {
-    pub fn new(lw: ListerWatcher<T>, eh: EventHandler<T>, store: Arc<Store<T>>) -> Self {
+    pub fn new(lw: ListerWatcher<T>, eh: EventHandler<T>) -> Self {
+        let store = Arc::new(RwLock::new(HashMap::new()));
         let reflector = Reflector {
             lw,
             store,
@@ -43,6 +46,10 @@ impl<T: Object> Informer<T> {
             reflector: Arc::new(reflector),
             eh,
         }
+    }
+
+    pub fn get_store(&self) -> Arc<RwLock<HashMap<String, T>>> {
+        self.reflector.store.clone()
     }
 
     pub async fn run(&self) -> Result<()> {

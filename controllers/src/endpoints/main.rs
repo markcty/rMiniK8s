@@ -1,12 +1,11 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{env, sync::Arc};
+use std::env;
 
 use anyhow::Result;
-use dashmap::DashMap;
 use reqwest::Url;
-use resources::{models::NodeConfig, objects::KubeObject};
+use resources::{informer::Store, models::NodeConfig, objects::KubeObject};
 use tokio::sync::mpsc;
 use utils::pod_ip_changed;
 
@@ -58,8 +57,10 @@ async fn main() -> Result<()> {
 
     let (tx, mut rx) = mpsc::channel::<Notification>(16);
 
-    let (pod_informer, pod_store) = create_pods_informer(tx.clone());
-    let (svc_informer, svc_store) = create_services_informer(tx.clone());
+    let pod_informer = create_pods_informer(tx.clone());
+    let pod_store = pod_informer.get_store();
+    let svc_informer = create_services_informer(tx.clone());
+    let svc_store = svc_informer.get_store();
 
     let pod_informer_handler = tokio::spawn(async move { pod_informer.run().await });
     let svc_informer_handler = tokio::spawn(async move { svc_informer.run().await });
@@ -77,8 +78,8 @@ async fn main() -> Result<()> {
 }
 
 async fn handle_notification(
-    pod_store: Arc<DashMap<String, KubeObject>>,
-    svc_store: Arc<DashMap<String, KubeObject>>,
+    pod_store: Store<KubeObject>,
+    svc_store: Store<KubeObject>,
     n: Notification,
 ) -> Result<()> {
     if let Notification::Pod(n) = n {

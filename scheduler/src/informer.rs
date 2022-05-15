@@ -1,10 +1,7 @@
-use std::sync::Arc;
-
 use anyhow::{anyhow, Error};
-use dashmap::DashMap;
 use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, WsStream},
+    informer::{EventHandler, Informer, ListerWatcher, Store, WsStream},
     models,
     objects::KubeObject,
 };
@@ -16,7 +13,7 @@ use tokio_tungstenite::connect_async;
 
 pub type RunInformerResult = (
     Receiver<KubeObject>,
-    Arc<DashMap<String, KubeObject>>,
+    Store<KubeObject>,
     JoinHandle<Result<(), Error>>,
 );
 
@@ -74,8 +71,8 @@ pub fn run_pod_informer() -> RunInformerResult {
     };
 
     // start the informer
-    let store = Arc::new(DashMap::new());
-    let informer = Informer::new(lw, eh, store.clone());
+    let informer = Informer::new(lw, eh);
+    let store = informer.get_store();
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
     (rx, store, informer_handler)
@@ -129,8 +126,8 @@ pub fn run_node_informer() -> RunInformerResult {
     };
 
     // start the informer
-    let store = Arc::new(DashMap::new());
-    let informer = Informer::new(lw, eh, store.clone());
+    let informer = Informer::new(lw, eh);
+    let store = informer.get_store();
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
     (rx, store, informer_handler)
