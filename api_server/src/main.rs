@@ -63,6 +63,7 @@ async fn main() -> Result<()> {
                    post(handler::replica_set::create)
                        .get(handler::replica_set::get)
                        .put(handler::replica_set::update)
+                       .patch(handler::replica_set::patch)
                        .delete(handler::replica_set::delete),
             ),
     );

@@ -103,6 +103,37 @@ pub async fn update(
 }
 
 #[debug_handler]
+pub async fn patch(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Path(rs_name): Path<String>,
+    Json(payload): Json<KubeObject>,
+) -> HandlerResult<()> {
+    let mut object = etcd_get_object(
+        &app_state,
+        format!("/api/v1/replicasets/{}", rs_name),
+        Some("replicaset"),
+    )
+    .await?;
+    match (&payload.resource, &mut object.resource) {
+        (KubeResource::ReplicaSet(payload_rs), KubeResource::ReplicaSet(ref mut rs)) => {
+            rs.spec = payload_rs.spec.to_owned();
+            etcd_put(
+                &app_state,
+                format!("/api/v1/replicasets/{}", rs_name),
+                object,
+            )
+            .await?;
+            let res = Response::new(Some(format!("replicaset/{} patched", rs_name)), None);
+            Ok(Json(res))
+        },
+        _ => Err(ErrResponse::new(
+            String::from("Error patching replicaset"),
+            Some(format!("Expecting replicaset kind, got {}", payload.kind())),
+        )),
+    }
+}
+
+#[debug_handler]
 pub async fn list(
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> HandlerResult<Vec<KubeObject>> {

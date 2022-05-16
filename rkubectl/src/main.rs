@@ -12,6 +12,7 @@ use strum::Display;
 mod create;
 mod delete;
 mod get;
+mod patch;
 mod utils;
 
 struct AppConfig {
@@ -43,6 +44,8 @@ enum Commands {
     Delete(delete::Arg),
     /// Get resources
     Get(get::Arg),
+    /// Patch a resource
+    Patch(patch::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -60,6 +63,7 @@ fn main() -> Result<()> {
         Commands::Create(arg) => arg.handle()?,
         Commands::Delete(arg) => arg.handle()?,
         Commands::Get(arg) => arg.handle()?,
+        Commands::Patch(arg) => arg.handle()?,
     }
 
     Ok(())
