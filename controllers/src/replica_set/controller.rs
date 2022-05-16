@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 
 use anyhow::{Context, Error, Result};
 use resources::{
@@ -6,7 +6,7 @@ use resources::{
     models::Response,
     objects::{
         object_reference::ObjectReference,
-        pod::Pod,
+        pod::{Pod, PodPhase},
         replica_set::{ReplicaSet, ReplicaSetStatus},
         KubeObject, KubeResource,
     },
@@ -176,7 +176,8 @@ impl ReplicaSetController {
             },
             Ordering::Greater => {
                 // Delete existing pods
-                todo!();
+                let pod_name = self.get_pod_to_delete(rs).await;
+                self.delete_pod(pod_name).await?;
             },
             Ordering::Equal => {
                 // Nothing to do
@@ -239,6 +240,21 @@ impl ReplicaSetController {
         Ok(())
     }
 
+    async fn delete_pod(&self, name: String) -> Result<()> {
+        let client = reqwest::Client::new();
+        let response = client
+            .delete(format!("{}/api/v1/pods/{}", CONFIG.api_server_url, name))
+            .send()
+            .await?
+            .json::<Response<()>>()
+            .await
+            .with_context(|| "Error deleting pod")?;
+        if let Some(msg) = response.msg {
+            tracing::info!("{}", msg);
+        }
+        Ok(())
+    }
+
     async fn resolve_owner(&self, refs: &[ObjectReference]) -> Option<KubeObject> {
         let owners: Vec<&ObjectReference> = refs
             .iter()
@@ -278,5 +294,36 @@ impl ReplicaSetController {
             replicas,
             ready_replicas,
         }
+    }
+
+    async fn get_pod_to_delete(&self, rs: &ReplicaSet) -> String {
+        let mut pods = self.get_pods(rs).await;
+        pods.sort_by(|a, b| {
+            let a = unwrap_pod(a);
+            let b = unwrap_pod(b);
+            let status_a = a.status.as_ref().unwrap();
+            let status_b = b.status.as_ref().unwrap();
+            if status_a.phase != status_b.phase {
+                let order = HashMap::from([
+                    (PodPhase::Failed, 0),
+                    (PodPhase::Pending, 1),
+                    (PodPhase::Running, 2),
+                    (PodPhase::Succeeded, 3),
+                ]);
+                return order
+                    .get(&status_a.phase)
+                    .unwrap()
+                    .cmp(order.get(&status_b.phase).unwrap());
+            }
+            // Not Ready < Ready
+            if a.is_ready() != b.is_ready() {
+                return a.is_ready().cmp(&b.is_ready());
+            }
+            if status_a.start_time != status_b.start_time {
+                return status_a.start_time.cmp(&status_b.start_time);
+            }
+            Ordering::Equal
+        });
+        pods[0].metadata.name.to_owned()
     }
 }

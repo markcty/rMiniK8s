@@ -188,7 +188,7 @@ impl Default for PodStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Display, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Display, Eq, PartialEq, Hash)]
 pub enum PodPhase {
     /// All containers in the pod have terminated,
     /// and at least one container has terminated in failure.
