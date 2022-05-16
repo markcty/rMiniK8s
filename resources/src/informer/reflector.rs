@@ -1,11 +1,12 @@
 use std::fmt::Debug;
 
 use anyhow::{anyhow, Result};
+use futures::stream::SplitStream;
 use futures_util::stream::StreamExt;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
-use super::{ListerWatcher, Store};
+use super::{ListerWatcher, Store, WsStream};
 use crate::{models::etcd::WatchEvent, objects::Object};
 
 pub(super) struct Reflector<T: Object> {
@@ -21,16 +22,48 @@ pub(super) enum ReflectorNotification<T> {
     Delete(T),
 }
 
-impl<T: Object> Reflector<T> {
-    pub(super) async fn run(&self, tx: mpsc::Sender<ReflectorNotification<T>>) -> Result<()> {
-        // pull the init changes
-        let objects: Vec<T> = (self.lw.lister)(()).await?;
-        for object in objects {
-            let key = object.uri();
-            self.store.write().await.insert(key, object);
-        }
-        let (_, mut receiver) = (self.lw.watcher)(()).await?.split();
+#[derive(Debug)]
+pub(super) struct ResyncNotification;
 
+impl<T: Object> Reflector<T> {
+    pub(super) async fn run(
+        &self,
+        tx: mpsc::Sender<ReflectorNotification<T>>,
+        resync_tx: mpsc::Sender<ResyncNotification>,
+    ) -> Result<()> {
+        loop {
+            let mut should_resync = false;
+            // lister
+            let objects: Vec<T> = (self.lw.lister)(()).await?;
+            let store = self.store.write().await;
+            for object in objects {
+                let key = object.uri();
+                if let Some(old_object) = store.get(&key) {
+                    if old_object == &object {
+                        continue;
+                    }
+                }
+                self.store.write().await.insert(key, object);
+                should_resync = true;
+            }
+            if should_resync {
+                resync_tx.send(ResyncNotification).await?;
+            }
+
+            // watcher
+            let (_, receiver) = (self.lw.watcher)(()).await?.split();
+            if let Err(e) = self.handle_watcher(tx.clone(), receiver).await {
+                tracing::debug!("Watcher ended unexpectedly, caused by: {}", e);
+                tracing::warn!("Restarting reflector")
+            }
+        }
+    }
+
+    pub async fn handle_watcher(
+        &self,
+        tx: mpsc::Sender<ReflectorNotification<T>>,
+        mut receiver: SplitStream<WsStream>,
+    ) -> Result<()> {
         loop {
             let msg: Message = receiver
                 .next()

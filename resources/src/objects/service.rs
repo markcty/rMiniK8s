@@ -1,4 +1,4 @@
-use std::{fmt::Debug, net::Ipv4Addr};
+use std::{collections::HashSet, fmt::Debug, net::Ipv4Addr};
 
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +18,7 @@ pub struct ServiceSpec {
     pub ports: Vec<ServicePort>,
     /// a collection of endpoints that implement the actual service
     #[serde(default)]
-    pub endpoints: Vec<Ipv4Addr>,
+    pub endpoints: HashSet<Ipv4Addr>,
     /// clusterIP is the IP address of the service and is usually assigned randomly
     pub cluster_ip: Option<Ipv4Addr>,
 }
