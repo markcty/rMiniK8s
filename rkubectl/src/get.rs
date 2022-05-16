@@ -33,16 +33,24 @@ impl Arg {
 
         match self.kind {
             ResourceKind::Pods => {
-                println!("{:<20} {:<8} {:<10}", "NAME", "STATUS", "AGE");
+                println!(
+                    "{:<20} {:<10} {:<8} {:<10}",
+                    "NAME", "STATUS", "RESTARTS", "AGE"
+                );
                 for object in res.data.unwrap() {
                     if let Pod(pod) = object.resource {
-                        let d = HumanTime::from(
-                            Local::now().naive_utc() - pod.status.as_ref().unwrap().start_time,
-                        );
+                        let status = pod.status.as_ref().unwrap();
+                        let d = HumanTime::from(Local::now().naive_utc() - status.start_time);
+                        let restarts = status
+                            .container_statuses
+                            .iter()
+                            .map(|c| c.restart_count)
+                            .sum::<u32>();
                         println!(
-                            "{:<20} {:<8} {:<10}",
+                            "{:<20} {:<10} {:<8} {:<10}",
                             object.metadata.name,
-                            pod.status.unwrap().phase,
+                            status.phase,
+                            restarts,
                             d.to_text_en(Accuracy::Rough, Tense::Present)
                         );
                     }

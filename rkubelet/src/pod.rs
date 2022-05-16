@@ -5,14 +5,14 @@ use std::{
 use anyhow::{Context, Result};
 use bollard::{
     container::Config,
-    models::{ContainerInspectResponse, ContainerStateStatusEnum, HostConfig},
+    models::{ContainerInspectResponse, HostConfig},
 };
 use futures::future::try_join_all;
 use resources::objects::{
     pod,
     pod::{
         ContainerState, ContainerStatus, PodCondition, PodConditionType, PodPhase, PodSpec,
-        PodStatus, VolumeMount,
+        PodStatus, RestartPolicy, VolumeMount,
     },
     KubeObject, KubeResource, Metadata,
 };
@@ -114,6 +114,7 @@ impl Pod {
             ipc_mode: mode.to_owned(),
             pid_mode: mode.to_owned(),
             binds,
+            restart_policy: Some((&self.spec.restart_policy).into()),
             ..Default::default()
         });
         let config = Config {
@@ -299,44 +300,45 @@ impl Pod {
 
     fn compute_phase(&self, containers: &Vec<ContainerInspectResponse>) -> PodPhase {
         let mut running = 0;
-        let mut failed = 0;
-        let mut exited = 0;
+        let mut waiting = 0;
+        let mut stopped = 0;
+        let mut succeeded = 0;
         for container in containers {
-            let state = &container.state;
-            if let Some(state) = state {
-                let status = state.status;
-                if let Some(status) = status {
-                    match status {
-                        ContainerStateStatusEnum::RUNNING => running += 1,
-                        ContainerStateStatusEnum::EXITED => {
-                            if let Some(exit_code) = state.exit_code {
-                                if exit_code != 0 {
-                                    failed += 1;
-                                } else {
-                                    exited += 1;
-                                }
-                            } else {
-                                exited += 1;
-                            }
-                        },
-                        ContainerStateStatusEnum::DEAD | ContainerStateStatusEnum::PAUSED => {
-                            failed += 1
-                        },
-                        ContainerStateStatusEnum::RESTARTING => running += 1,
-                        _ => (),
+            let state = ContainerState::from(container.state.to_owned());
+            match state {
+                ContainerState::Running => running += 1,
+                ContainerState::Terminated => {
+                    stopped += 1;
+                    if let Some(exit_code) =
+                        container.state.to_owned().and_then(|state| state.exit_code)
+                    {
+                        if exit_code == 0 {
+                            succeeded += 1;
+                        }
                     }
-                }
+                },
+                ContainerState::Waiting => waiting += 1,
             }
         }
-        let total = self.spec.containers.len();
-        if running == 0 {
-            if failed > 0 {
-                return PodPhase::Failed;
-            } else if exited == total {
+
+        if waiting > 0 {
+            return PodPhase::Pending;
+        }
+        if running > 0 {
+            return PodPhase::Running;
+        }
+        if running == 0 && stopped > 0 {
+            if self.spec.restart_policy == RestartPolicy::Always {
+                // Restarting
+                return PodPhase::Running;
+            }
+            if stopped == succeeded {
                 return PodPhase::Succeeded;
             }
-        }
-        if running > 0 && failed == 0 {
+            if self.spec.restart_policy == RestartPolicy::Never {
+                // If stopped != succeeded, at least one container failed
+                return PodPhase::Failed;
+            }
             return PodPhase::Running;
         }
         PodPhase::Pending

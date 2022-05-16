@@ -1,6 +1,6 @@
 use std::{collections::HashMap, default::Default, net::Ipv4Addr};
 
-use bollard::models::{ContainerInspectResponse, ContainerStateStatusEnum};
+use bollard::models::{ContainerInspectResponse, ContainerStateStatusEnum, RestartPolicyNameEnum};
 use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
@@ -35,6 +35,11 @@ pub struct PodSpec {
     /// List of volumes that can be mounted by containers belonging to the pod.
     #[serde(default)]
     pub volumes: Vec<Volume>,
+    /// Restart policy for all containers within the pod.
+    /// One of Always, OnFailure, Never.
+    /// Default to Always.
+    #[serde(default)]
+    pub restart_policy: RestartPolicy,
     /// Host networking requested for this pod.
     /// Use the host's network namespace.
     /// If this option is set, the ports that will be used must be specified.
@@ -144,6 +149,35 @@ pub enum VolumeConfig {
     HostPath(String),
     /// EmptyDir represents a temporary directory that shares a pod's lifetime.
     EmptyDir(()),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub enum RestartPolicy {
+    Always,
+    OnFailure,
+    Never,
+}
+
+impl Default for RestartPolicy {
+    fn default() -> Self {
+        RestartPolicy::Always
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<bollard::models::RestartPolicy> for &RestartPolicy {
+    fn into(self) -> bollard::models::RestartPolicy {
+        let policy = match self {
+            RestartPolicy::Always => RestartPolicyNameEnum::ALWAYS,
+            RestartPolicy::OnFailure => RestartPolicyNameEnum::ON_FAILURE,
+            RestartPolicy::Never => RestartPolicyNameEnum::NO,
+        };
+
+        bollard::models::RestartPolicy {
+            name: Some(policy),
+            maximum_retry_count: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -269,6 +303,8 @@ pub struct ContainerStatus {
     pub container_id: String,
     /// State is the current state of the container.
     pub state: ContainerState,
+    /// The number of times the container has been restarted.
+    pub restart_count: u32,
 }
 
 impl From<ContainerInspectResponse> for ContainerStatus {
@@ -278,6 +314,7 @@ impl From<ContainerInspectResponse> for ContainerStatus {
             image: response.image.expect("Container image not found"),
             container_id: response.id.expect("Container ID not found"),
             state: ContainerState::from(response.state),
+            restart_count: response.restart_count.unwrap_or(0) as u32,
         }
     }
 }
