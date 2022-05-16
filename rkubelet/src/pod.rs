@@ -10,7 +10,10 @@ use bollard::{
 use futures::future::try_join_all;
 use resources::objects::{
     pod,
-    pod::{ContainerStatus, PodPhase, PodSpec, PodStatus, VolumeMount},
+    pod::{
+        ContainerState, ContainerStatus, PodCondition, PodConditionType, PodPhase, PodSpec,
+        PodStatus, VolumeMount,
+    },
     KubeObject, KubeResource, Metadata,
 };
 
@@ -204,11 +207,15 @@ impl Pod {
         let containers = self.inspect_containers().await?;
         let phase = self.compute_phase(&containers);
         // TODO: strip uid off container names
-        let container_statuses = containers.into_iter().map(ContainerStatus::from).collect();
+        let container_statuses = containers
+            .into_iter()
+            .map(ContainerStatus::from)
+            .collect::<Vec<_>>();
         // TODO: determine pod conditions
         let new_status = PodStatus {
             phase,
             pod_ip,
+            conditions: self.determine_conditions(&container_statuses),
             container_statuses,
             ..self.status.clone()
         };
@@ -333,5 +340,29 @@ impl Pod {
             return PodPhase::Running;
         }
         PodPhase::Pending
+    }
+
+    fn determine_conditions(
+        &self,
+        containers: &[ContainerStatus],
+    ) -> HashMap<PodConditionType, PodCondition> {
+        let mut conditions = self.status.conditions.to_owned();
+        let containers_ready = containers
+            .iter()
+            .all(|status| status.state == ContainerState::Running);
+        conditions.insert(
+            PodConditionType::ContainersReady,
+            PodCondition {
+                status: containers_ready,
+            },
+        );
+        // TODO: Since we don't have readiness gates, this is equivalent to ContainersReady
+        conditions.insert(
+            PodConditionType::Ready,
+            PodCondition {
+                status: containers_ready,
+            },
+        );
+        conditions
     }
 }

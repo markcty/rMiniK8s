@@ -8,7 +8,7 @@ anyhow = "1.0.56"
 bollard = "0.12.0"
 clap = { version = "3.1.13", features = ["derive"] }
 config = { version = "0.13.1", features = ["yaml"] }
-dashmap = "5.2.0"
+dashmap = "5.3.3"
 futures = "0.3"
 lazy_static = "1.4.0"
 resources = { path = "../resources" }

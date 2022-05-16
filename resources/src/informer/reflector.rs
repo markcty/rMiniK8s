@@ -50,6 +50,7 @@ impl<T: Object> Reflector<T> {
                             let old = object.clone();
 
                             if old == e.object {
+                                tracing::debug!("Object {} is already up to date", e.key);
                                 continue;
                             }
 
