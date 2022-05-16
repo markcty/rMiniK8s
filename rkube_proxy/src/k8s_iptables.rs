@@ -1,4 +1,9 @@
-use std::{collections::HashMap, error::Error, net::Ipv4Addr, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    net::Ipv4Addr,
+    rc::Rc,
+};
 
 use anyhow::{anyhow, Context, Result};
 use iptables::IPTables;
@@ -194,7 +199,7 @@ impl K8sIpTables {
         ipt
     }
 
-    fn cleanup(&self) -> Result<(), Box<dyn Error>> {
+    pub fn cleanup(&self) -> Result<(), Box<dyn Error>> {
         let chains = &self.ipt.list_chains("nat")?;
         if !chains.contains(&"KUBE-SERVICES".to_string()) {
             self.ipt.new_chain("nat", "KUBE-SERVICES")?;
@@ -246,6 +251,8 @@ impl K8sIpTables {
                 self.ipt.delete_chain("nat", chain.as_str())?;
             }
         }
+
+        tracing::info!("IpTable cleanup finished");
 
         Ok(())
     }
@@ -324,11 +331,11 @@ impl K8sIpTables {
     }
 }
 
-fn get_svc_eps(svc: &KubeObject) -> Vec<Ipv4Addr> {
+fn get_svc_eps(svc: &KubeObject) -> HashSet<Ipv4Addr> {
     if let Service(ref svc) = svc.resource {
         svc.spec.endpoints.clone()
     } else {
-        vec![]
+        HashSet::new()
     }
 }
 

@@ -1,16 +1,17 @@
 use anyhow::{anyhow, Ok};
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, Store},
+    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store},
     models::Response,
     objects::KubeObject,
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
 
-use crate::{Notification, CONFIG};
+use crate::{Notification, ResyncNotification, CONFIG};
 
 pub fn create_services_informer(
     tx: Sender<Notification>,
+    tx_resync: Sender<ResyncNotification>,
 ) -> (Informer<KubeObject>, Store<KubeObject>) {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
@@ -60,9 +61,16 @@ pub fn create_services_informer(
             })
         }),
     };
+    let rh = ResyncHandler(Box::new(move |_| {
+        let resync_tx = tx_resync.clone();
+        Box::pin(async move {
+            resync_tx.send(ResyncNotification).await?;
+            Ok(())
+        })
+    }));
 
     // start the informer
-    let informer = Informer::new(lw, eh);
+    let informer = Informer::new(lw, eh, rh);
     let store = informer.get_store();
     (informer, store)
 }

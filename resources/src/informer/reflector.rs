@@ -1,9 +1,9 @@
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::{anyhow, Result};
 use futures::stream::SplitStream;
 use futures_util::stream::StreamExt;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::Duration};
 use tokio_tungstenite::tungstenite::Message;
 
 use super::{ListerWatcher, Store, WsStream};
@@ -34,26 +34,38 @@ impl<T: Object> Reflector<T> {
         loop {
             let mut should_resync = false;
             // lister
-            let objects: Vec<T> = (self.lw.lister)(()).await?;
-            let store = self.store.write().await;
-            for object in objects {
-                let key = object.uri();
-                if let Some(old_object) = store.get(&key) {
-                    if old_object == &object {
-                        continue;
+            {
+                let objects;
+                loop {
+                    let result = (self.lw.lister)(()).await;
+                    if let Err(e) = result {
+                        tracing::warn!("list failed, caused by: {}", e);
+                    } else if let Ok(result) = result {
+                        objects = result;
+                        break;
                     }
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
-                self.store.write().await.insert(key, object);
-                should_resync = true;
+                let mut new_store = HashMap::new();
+                for object in objects {
+                    new_store.insert(object.uri(), object);
+                }
+                let mut old_store = self.store.write().await;
+                if !old_store.eq(&new_store) {
+                    should_resync = true;
+                    old_store.clone_from(&new_store);
+                }
             }
             if should_resync {
+                tracing::warn!("Inconsitent store, resync...");
                 resync_tx.send(ResyncNotification).await?;
             }
+            tracing::info!("List succeeded");
 
             // watcher
             let (_, receiver) = (self.lw.watcher)(()).await?.split();
             if let Err(e) = self.handle_watcher(tx.clone(), receiver).await {
-                tracing::debug!("Watcher ended unexpectedly, caused by: {}", e);
+                tracing::warn!("Watcher ended unexpectedly, caused by: {}", e);
                 tracing::warn!("Restarting reflector")
             }
         }

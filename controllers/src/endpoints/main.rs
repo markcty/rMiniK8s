@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
     loop {
         select! {
             _ = resync_rx.recv() => {
-                handle_resync(pod_store.to_owned(),svc_store.to_owned()).await?;
+                handle_resync(pod_store.to_owned(), svc_store.to_owned()).await?;
             },
             Some(n) = rx.recv() => {
                 if let Err(e) = handle_notification(pod_store.to_owned(), svc_store.to_owned(), n).await {
@@ -96,6 +96,8 @@ async fn main() -> Result<()> {
 }
 
 async fn handle_resync(pod_store: Store<KubeObject>, svc_store: Store<KubeObject>) -> Result<()> {
+    tracing::info!("Resync ...");
+
     let mut svc_store = svc_store.write().await;
     let pod_store = pod_store.read().await;
     for (_, svc) in svc_store.iter_mut() {
@@ -119,6 +121,7 @@ async fn handle_resync(pod_store: Store<KubeObject>, svc_store: Store<KubeObject
             update_service(svc).await?;
         }
     }
+    tracing::info!("Resync succeeded!");
 
     Ok(())
 }

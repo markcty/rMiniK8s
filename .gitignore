@@ -1,2 +1,4 @@
 .idea
 target
+.vscode
+.DS_Store

@@ -6,8 +6,8 @@ use std::env;
 use anyhow::Result;
 use k8s_iptables::K8sIpTables;
 use reqwest::Url;
-use resources::{models::NodeConfig, objects::KubeObject};
-use tokio::sync::mpsc;
+use resources::{informer::Store, models::NodeConfig, objects::KubeObject};
+use tokio::{select, sync::mpsc};
 
 use crate::utils::create_services_informer;
 
@@ -20,6 +20,9 @@ pub enum Notification {
     Update(KubeObject, KubeObject),
     Delete(KubeObject),
 }
+
+#[derive(Debug)]
+pub struct ResyncNotification;
 
 lazy_static! {
     static ref CONFIG: NodeConfig = {
@@ -45,18 +48,38 @@ async fn main() -> Result<()> {
     let mut ipt = K8sIpTables::new();
 
     let (tx, mut rx) = mpsc::channel::<Notification>(16);
+    let (resync_tx, mut resync_rx) = mpsc::channel::<ResyncNotification>(16);
 
-    let (svc_informer, _) = create_services_informer(tx.clone());
+    let (svc_informer, svc_store) = create_services_informer(tx.clone(), resync_tx);
     let informer_handler = tokio::spawn(async move { svc_informer.run().await });
 
-    while let Some(n) = rx.recv().await {
-        if let Err(e) = handle_notification(&mut ipt, n).await {
-            tracing::warn!("Error handling notification, caused by: {}", e);
+    loop {
+        select! {
+            _ = resync_rx.recv() => {
+                handle_resync(&mut ipt, svc_store.to_owned()).await?;
+            },
+            Some(n) = rx.recv() => {
+                if let Err(e) = handle_notification(&mut ipt, n).await {
+                    tracing::warn!("Error handling notification, caused by: {}", e);
+                }
+            },
+            else => break,
         }
     }
 
     informer_handler.await??;
 
+    Ok(())
+}
+
+async fn handle_resync(ipt: &mut K8sIpTables, svc_store: Store<KubeObject>) -> Result<()> {
+    ipt.cleanup().expect("Failed to cleanup ip table");
+    let store = svc_store.read().await;
+    for (_, svc) in store.iter() {
+        ipt.add_svc(svc);
+    }
+
+    tracing::info!("Resync succeeded!");
     Ok(())
 }
 
