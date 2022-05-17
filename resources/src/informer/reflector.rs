@@ -63,10 +63,16 @@ impl<T: Object> Reflector<T> {
             tracing::info!("List succeeded");
 
             // watcher
-            let (_, receiver) = (self.lw.watcher)(()).await?.split();
-            if let Err(e) = self.handle_watcher(tx.clone(), receiver).await {
-                tracing::warn!("Watcher ended unexpectedly, caused by: {}", e);
-                tracing::warn!("Restarting reflector")
+            match (self.lw.watcher)(()).await {
+                Ok(stream) => {
+                    let (_, receiver) = stream.split();
+                    tracing::info!("Watcher connected, receiving events...");
+                    if let Err(e) = self.handle_watcher(tx.clone(), receiver).await {
+                        tracing::warn!("Watcher ended unexpectedly, caused by: {}", e);
+                        tracing::warn!("Restarting reflector")
+                    }
+                },
+                Err(e) => tracing::warn!("Watcher failed, caused by: {}", e),
             }
         }
     }
