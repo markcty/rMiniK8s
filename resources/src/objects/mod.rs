@@ -8,6 +8,7 @@ use uuid::Uuid;
 use self::object_reference::ObjectReference;
 
 pub mod binding;
+pub mod ingress;
 pub mod node;
 pub mod object_reference;
 pub mod pod;
@@ -29,6 +30,7 @@ pub enum KubeResource {
     Node(node::Node),
     Service(service::Service),
     ReplicaSet(replica_set::ReplicaSet),
+    Ingress(ingress::Ingress),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]

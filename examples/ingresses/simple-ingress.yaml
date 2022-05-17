@@ -1,0 +1,11 @@
+kind: Ingress
+metadata:
+  name: minimal-ingress
+spec:
+  rules:
+  - host: server.minik8s.com
+    paths:
+    - path: /testpath
+      service:
+        name: test
+        port: 80
