@@ -108,7 +108,7 @@ impl Pod {
         let binds = self.bind_mounts(&volumes, &container.volume_mounts)?;
 
         let host_config = Some(HostConfig {
-            cpu_shares: Some(container.resources.limits.cpu),
+            cpu_shares: Some(container.resources.cpu_shares()),
             memory: Some(container.resources.limits.memory),
             network_mode: mode.to_owned(),
             ipc_mode: mode.to_owned(),

@@ -103,29 +103,47 @@ pub struct VolumeMount {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct ResourceRequirements {
     /// Limits describes the maximum amount of compute resources allowed.
     pub limits: Resource,
+    /// Requests describes the minimum amount of compute resources required.
+    /// If Requests is omitted for a container,
+    /// it defaults to Limits if that is explicitly specified,
+    /// otherwise to an implementation-defined value.
+    pub requests: Resource,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+impl ResourceRequirements {
+    pub fn cpu_shares(&self) -> i64 {
+        ResourceRequirements::milli_cpu_to_shares(
+            if self.requests.cpu == 0 && !self.limits.cpu == 0 {
+                self.limits.cpu
+            } else {
+                self.requests.cpu
+            },
+        )
+    }
+
+    fn milli_cpu_to_shares(milli_cpu: i64) -> i64 {
+        const MIN_SHARES: i64 = 2;
+        const SHARES_PER_CPU: i64 = 1024;
+        const MILLI_CPU_TO_CPU: i64 = 1000;
+        if milli_cpu == 0 {
+            return MIN_SHARES;
+        }
+        let shares = (milli_cpu as i64) * SHARES_PER_CPU / MILLI_CPU_TO_CPU;
+        shares.max(MIN_SHARES)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 #[serde(default)]
 pub struct Resource {
-    /// An integer value representing this container's
-    /// relative CPU weight versus other containers. Defaults to 100.
+    /// CPU unit in milli CPU.
     pub cpu: i64,
-    /// Memory limit in bytes. Defaults to 0.
+    /// Memory in bytes. Defaults to 0.
     pub memory: i64,
-}
-
-impl Default for Resource {
-    fn default() -> Self {
-        Resource {
-            cpu: 100,
-            memory: 0,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
