@@ -327,8 +327,13 @@ pub struct ContainerStatus {
 
 impl From<ContainerInspectResponse> for ContainerStatus {
     fn from(response: ContainerInspectResponse) -> Self {
+        let labels = response.config.and_then(|c| c.labels).unwrap_or_default();
+        let name = labels
+            .get("minik8s.container.name")
+            .unwrap_or(&"".to_string())
+            .to_owned();
         ContainerStatus {
-            name: response.name.expect("Container name not found"),
+            name,
             image: response.image.expect("Container image not found"),
             container_id: response.id.expect("Container ID not found"),
             state: ContainerState::from(response.state),
