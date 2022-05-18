@@ -54,6 +54,7 @@ enum ResourceKind {
     Pods,
     ReplicaSets,
     Services,
+    Ingresses,
 }
 
 fn main() -> Result<()> {

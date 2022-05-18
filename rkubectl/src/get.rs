@@ -7,7 +7,7 @@ use resources::{
     models::Response,
     objects::{
         KubeObject,
-        KubeResource::{Pod, ReplicaSet, Service},
+        KubeResource::{self, Pod, ReplicaSet, Service},
     },
 };
 
@@ -104,6 +104,27 @@ impl Arg {
                             ports,
                             eps
                         );
+                    }
+                }
+            },
+            ResourceKind::Ingresses => {
+                println!("{:<20} {:<30} PATH:SERVICE:PORT", "NAME", "HOST");
+                for object in res.data.unwrap() {
+                    let name = object.name();
+                    if let KubeResource::Ingress(ingress) = object.resource {
+                        for rule in ingress.spec.rules {
+                            let mut paths = rule.paths.iter().fold("".to_string(), |sum, path| {
+                                sum + path.path.as_str()
+                                    + ":"
+                                    + path.service.name.as_str()
+                                    + ":"
+                                    + path.service.port.to_string().as_str()
+                                    + ","
+                            });
+                            paths.pop();
+
+                            println!("{:<20} {:<30} {}", name, rule.host.unwrap(), paths);
+                        }
                     }
                 }
             },
