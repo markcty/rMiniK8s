@@ -18,13 +18,12 @@ use crate::{etcd::forward_watch_to_ws, AppState};
 #[debug_handler]
 pub async fn create(
     Extension(app_state): Extension<Arc<AppState>>,
-    Path(pod_name): Path<String>,
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
     if let KubeResource::Pod(ref mut pod) = payload.resource {
         payload.metadata.uid = Some(Uuid::new_v4());
-        payload.metadata.name = unique_name(&pod_name);
+        payload.metadata.name = unique_name(&payload.metadata.name);
         let pod_name = &payload.metadata.name;
 
         let mut status = pod.status.clone().unwrap_or_default();

@@ -47,10 +47,11 @@ async fn main() -> Result<()> {
     let pod_routes = Router::new().nest(
         "/pods",
         Router::new()
-            .route("/", get(handler::pod::list))
+            .route("/",
+                   get(handler::pod::list)
+                       .post(handler::pod::create))
             .route("/:name",
-                   post(handler::pod::create)
-                       .get(handler::pod::get)
+                   get(handler::pod::get)
                        .put(handler::pod::replace)
                        .delete(handler::pod::delete),
             ),
@@ -60,10 +61,11 @@ async fn main() -> Result<()> {
     let rs_routes = Router::new().nest(
         "/replicasets",
         Router::new()
-            .route("/", get(handler::replica_set::list))
+            .route("/",
+                   get(handler::replica_set::list)
+                       .post(handler::replica_set::create))
             .route("/:name",
-                   post(handler::replica_set::create)
-                       .get(handler::replica_set::get)
+                   get(handler::replica_set::get)
                        .put(handler::replica_set::update)
                        .patch(handler::replica_set::patch)
                        .delete(handler::replica_set::delete),
@@ -74,13 +76,13 @@ async fn main() -> Result<()> {
     let service_routes = Router::new().nest(
         "/services",
         Router::new()
-            .route("/", get(handler::service::list))
-            .route(
-                "/:name",
-                post(handler::service::create)
-                    .get(handler::service::get)
-                    .put(handler::service::update)
-                    .delete(handler::service::delete),
+            .route("/",
+                   get(handler::service::list)
+                       .post(handler::service::create))
+            .route("/:name",
+                   get(handler::service::get)
+                       .put(handler::service::update)
+                       .delete(handler::service::delete),
             ),
     );
 
