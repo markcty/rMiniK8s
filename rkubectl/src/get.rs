@@ -1,17 +1,18 @@
-use anyhow::{anyhow, Result};
-use chrono::Local;
-use chrono_humanize::{Accuracy, HumanTime, Tense};
+use anyhow::{anyhow, Context, Result};
 use clap::Args;
 use reqwest::blocking::Client;
 use resources::{
     models::Response,
     objects::{
         KubeObject,
-        KubeResource::{Pod, ReplicaSet, Service},
+        KubeResource::{HorizontalPodAutoscaler, Pod, ReplicaSet, Service},
     },
 };
 
-use crate::{utils::gen_url, ResourceKind};
+use crate::{
+    utils::{calc_age, gen_url},
+    ResourceKind,
+};
 
 #[derive(Args)]
 pub struct Arg {
@@ -40,7 +41,6 @@ impl Arg {
                 for object in res.data.unwrap() {
                     if let Pod(pod) = object.resource {
                         let status = pod.status.as_ref().unwrap();
-                        let d = HumanTime::from(Local::now().naive_utc() - status.start_time);
                         let restarts = status
                             .container_statuses
                             .iter()
@@ -51,7 +51,7 @@ impl Arg {
                             object.metadata.name,
                             status.phase,
                             restarts,
-                            d.to_text_en(Accuracy::Rough, Tense::Present)
+                            calc_age(status.start_time)
                         );
                     }
                 }
@@ -103,6 +103,33 @@ impl Arg {
                             ))?,
                             ports,
                             eps
+                        );
+                    }
+                }
+            },
+            ResourceKind::HorizontalPodAutoscalers => {
+                println!(
+                    "{:<16} {:<24} {:<8} {:<8} {:<}",
+                    "NAME", "REFERENCE", "CURRENT", "DESIRED", "LAST SCALE"
+                );
+                for object in res.data.unwrap() {
+                    if let HorizontalPodAutoscaler(hpa) = object.resource {
+                        let status = hpa
+                            .status
+                            .with_context(|| anyhow!("HorizontalPodAutoscaler has no status"))?;
+                        let last_scale = status
+                            .last_scale_time
+                            .map(calc_age)
+                            .unwrap_or_else(|| "Never".to_string());
+                        let scale_target = hpa.spec.scale_target_ref;
+                        let reference = format!("{}/{}", scale_target.kind, scale_target.name);
+                        println!(
+                            "{:<16} {:<24} {:<8} {:<8} {:<}",
+                            object.metadata.name,
+                            reference,
+                            status.current_replicas,
+                            status.desired_replicas,
+                            last_scale
                         );
                     }
                 }

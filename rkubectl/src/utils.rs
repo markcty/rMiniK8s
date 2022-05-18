@@ -14,9 +14,14 @@ pub fn gen_url_from_object(object: &KubeObject) -> Result<Url> {
 pub fn gen_url(kind: String, name: Option<&String>) -> Result<Url> {
     let url = CONFIG.base_url.to_owned();
     let path = if let Some(name) = name {
-        format!("api/v1/{}s/{}", kind, name)
+        format!("api/v1/{}/{}", kind, name)
     } else {
-        format!("api/v1/{}s", kind)
+        format!("api/v1/{}", kind)
     };
     Ok(url.join(path.as_str())?)
+}
+
+pub fn calc_age(time: NaiveDateTime) -> String {
+    let d = HumanTime::from(Local::now().naive_utc() - time);
+    d.to_text_en(Accuracy::Rough, Tense::Present)
 }
