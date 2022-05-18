@@ -93,6 +93,14 @@ async fn reconfigure_nginx(
                     };
 
                     host.add_path(&path.path, cluster_ip, &path.service.port);
+                    tracing::info!(
+                        "add path {}{} for service {}:{}:{}",
+                        rule.host.as_ref().unwrap(),
+                        path.path,
+                        path.service.name,
+                        cluster_ip,
+                        path.service.port
+                    );
                 } else {
                     tracing::warn!(
                         "Failed to add service {} to path {}, no such service exists",

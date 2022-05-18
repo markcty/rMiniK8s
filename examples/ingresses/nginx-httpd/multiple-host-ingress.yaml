@@ -1,0 +1,23 @@
+kind: Ingress
+metadata:
+  name: nh-host-ingress
+spec:
+  rules:
+  - host: nginx.minik8s.com
+    paths:
+    - path: /
+      service:
+        name: nginx-service
+        port: 80
+  - host: httpd.minik8s.com
+    paths:
+    - path: /
+      service:
+        name: httpd-service
+        port: 80
+  - host: tomcat.minik8s.com
+    paths:
+    - path: /
+      service:
+        name: tomcat-service
+        port: 80

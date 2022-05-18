@@ -81,20 +81,26 @@ impl Arg {
                 );
                 for object in res.data.unwrap() {
                     if let Service(svc) = object.resource {
-                        let mut ports = svc.spec.ports.iter().fold("".to_string(), |sum, port| {
-                            if port.port == port.target_port {
-                                sum + &port.port.to_string() + ","
-                            } else {
-                                sum + &format!("{}:{},", port.port, port.target_port)
-                            }
-                        });
-                        ports.pop();
-                        let mut eps = svc
+                        let ports = svc
+                            .spec
+                            .ports
+                            .iter()
+                            .map(|port| {
+                                if port.port == port.target_port {
+                                    port.port.to_string()
+                                } else {
+                                    format!("{}:{},", port.port, port.target_port)
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(",");
+                        let eps = svc
                             .spec
                             .endpoints
                             .iter()
-                            .fold("".to_string(), |sum, ip| sum + &ip.to_string() + ",");
-                        eps.pop();
+                            .map(|ip| ip.to_string())
+                            .collect::<Vec<_>>()
+                            .join(",");
                         println!(
                             "{: <20} {: <16} {: <20} {:<}",
                             object.metadata.name,
@@ -113,15 +119,17 @@ impl Arg {
                     let name = object.name();
                     if let KubeResource::Ingress(ingress) = object.resource {
                         for rule in ingress.spec.rules {
-                            let mut paths = rule.paths.iter().fold("".to_string(), |sum, path| {
-                                sum + path.path.as_str()
-                                    + ":"
-                                    + path.service.name.as_str()
-                                    + ":"
-                                    + path.service.port.to_string().as_str()
-                                    + ","
-                            });
-                            paths.pop();
+                            let paths = rule
+                                .paths
+                                .iter()
+                                .map(|path| {
+                                    format!(
+                                        "{}:{}:{}",
+                                        path.path, path.service.name, path.service.port
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join(",");
 
                             println!("{:<20} {:<30} {}", name, rule.host.unwrap(), paths);
                         }

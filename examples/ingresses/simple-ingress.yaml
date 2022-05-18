@@ -7,5 +7,5 @@ spec:
     paths:
     - path: /testpath
       service:
-        name: test
+        name: server-service
         port: 80

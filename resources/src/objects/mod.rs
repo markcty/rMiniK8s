@@ -81,7 +81,7 @@ impl Object for KubeObject {
         let kind_prural = if self.kind() == "ingress" {
             "ingresses".to_string()
         } else {
-            self.kind()
+            self.kind() + "s"
         };
         format!("/api/v1/{}/{}", kind_prural, self.name().to_lowercase())
     }

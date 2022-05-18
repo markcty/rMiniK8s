@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
             .route("/pods", get(handler::pod::watch_all))
             .route("/replicasets", get(handler::replica_set::watch_all))
             .route("/services", get(handler::service::watch_all))
-            .route("/ingress",get(handler::ingress::watch_all))
+            .route("/ingresses",get(handler::ingress::watch_all))
     );
 
     let app = Router::new()

@@ -6,7 +6,7 @@ Download links:
 
 SSH clone URL: ssh://git@git.jetbrains.space/minik8s/minik-8-s/rminik8s.git
 
-HTTPS clone URL: https://git.jetbrains.space/minik8s/minik-8-s/rminik8s.git
+HTTPS clone URL: <https://git.jetbrains.space/minik8s/minik-8-s/rminik8s.git>
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing
 purposes.
@@ -20,6 +20,13 @@ docker
 ```
 
 ## Deployment
+
+### Master
+
+```shell
+# please run in root
+bash <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy-master.sh)
+```
 
 ### Node
 
@@ -40,7 +47,7 @@ multipass shell k8s1
 
 ```shell
 # please run in root
-bash <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy.sh)
+bash <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy-node.sh)
 ```
 
 ## Resources

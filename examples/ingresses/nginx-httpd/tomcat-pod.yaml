@@ -1,0 +1,11 @@
+kind: Pod
+metadata:
+  name: tomcat
+  labels:
+    app: tomcat
+spec:
+  containers:
+    - name: tomcat
+      image: tomcat:latest
+      ports:
+        - containerPort: 8080

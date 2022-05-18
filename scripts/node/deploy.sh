@@ -32,6 +32,19 @@ if [ ! -f /etc/rminik8s/conf.env ]; then
   printf 'ETCD_ENDPOINT="%s"\n' "$ETCD_ENDPOINT" > /etc/rminik8s/conf.env
 fi
 
+# modify dns
+systemctl stop systemd-resolved
+if grep -Fq "minik8s" /etc/resolv.conf;
+then
+  echo "DNS already configured"
+else
+  echo -n "Please input DNS server ip: "
+  read -r DNS_SERVER_IP
+  mv /etc/resolv.conf /etc/resolv.conf.bk
+  printf '#minik8s\nnameserver %s\n' "$DNS_SERVER_IP" | cat - /etc/resolv.conf.bk > /etc/resolv.conf
+fi
+
+
 # start
 systemctl daemon-reload
 systemctl restart flanneld.service

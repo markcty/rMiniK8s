@@ -1,0 +1,11 @@
+kind: Pod
+metadata:
+  name: httpd
+  labels:
+    app: httpd
+spec:
+  containers:
+    - name: httpd
+      image: httpd:latest
+      ports:
+        - containerPort: 80

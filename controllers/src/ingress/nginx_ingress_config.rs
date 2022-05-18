@@ -14,7 +14,6 @@ events {
 
 const CONFIG_BASE: &str = r#"
 http {
-
     SERVERS
 
     server {
@@ -31,12 +30,10 @@ http {
 
 const SERVER_BASE: &str = r#"
 server {
+    server_name SERVER_NAME;
+    listen 80;
 
-server_name SERVER_NAME;
-listen 80;
-
-LOCATIONS
-
+    LOCATIONS
 }
 "#;
 
