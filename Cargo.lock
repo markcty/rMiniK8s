@@ -63,12 +63,14 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-macros",
+ "chrono",
  "config",
  "dashmap",
  "deadpool",
  "etcd-client",
  "futures",
  "lazy_static",
+ "prometheus-http-api",
  "rand",
  "resources",
  "serde",
@@ -1455,6 +1457,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec757218438d5fda206afc041538b2f6d889286160d649a86a24d37e1235afd1"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "prometheus-http-api"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41713d1aeba52d68957eccf06b07cc1ba5dc3a8d37d70a54db013658f98645cf"
+dependencies = [
+ "http",
+ "hyper",
+ "hyper-tls",
+ "percent-encoding",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

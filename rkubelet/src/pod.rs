@@ -122,6 +122,10 @@ impl Pod {
             format!("{}.container.name", CONTAINER_NAME_PREFIX),
             container.name.to_owned(),
         );
+        labels.insert(
+            format!("{}.container.type", CONTAINER_NAME_PREFIX),
+            "container".to_string(),
+        );
         let config = Config {
             image: Some(image.name().to_owned()),
             entrypoint: Some(container.command.to_owned()),
@@ -152,6 +156,10 @@ impl Pod {
         labels.insert(
             format!("{}.container.name", CONTAINER_NAME_PREFIX),
             SANDBOX_NAME.to_owned(),
+        );
+        labels.insert(
+            format!("{}.container.type", CONTAINER_NAME_PREFIX),
+            "podsandbox".to_string(),
         );
         let config = Config {
             image: Some(image.name().to_owned()),

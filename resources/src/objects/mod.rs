@@ -120,7 +120,7 @@ impl ToString for Labels {
     }
 }
 
-impl TryFrom<String> for Labels {
+impl TryFrom<&String> for Labels {
     type Error = anyhow::Error;
 
     /// Parse a string of the form "key1=value1,key2=value2" into a Labels.
@@ -129,7 +129,7 @@ impl TryFrom<String> for Labels {
     /// ```rust
     /// use resources::objects::Labels;
     ///
-    /// let labels = Labels::try_from("key1=value1,key2=value2".to_string()).unwrap();
+    /// let labels = Labels::try_from(&"key1=value1,key2=value2".to_string()).unwrap();
     /// assert_eq!(labels.0.get(&"key1".to_string()), Some(&"value1".to_string()));
     /// assert_eq!(labels.0.get(&"key2".to_string()), Some(&"value2".to_string()));
     /// ```
@@ -138,10 +138,10 @@ impl TryFrom<String> for Labels {
     /// ```rust
     /// use resources::objects::Labels;
     ///
-    /// let labels = Labels::try_from("key1=value1,key2".to_string());
+    /// let labels = Labels::try_from(&"key1=value1,key2".to_string());
     /// assert!(labels.is_err());
     /// ```
-    fn try_from(s: String) -> Result<Labels> {
+    fn try_from(s: &String) -> Result<Labels> {
         let mut labels = HashMap::new();
         for label in s.split(',') {
             let mut parts = label.split('=');

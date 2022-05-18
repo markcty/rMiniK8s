@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub type EtcdPool = managed::Pool<EtcdManager>;
 pub type EtcdClient = managed::Object<EtcdManager>;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct EtcdConfig {
     url: String,
 }

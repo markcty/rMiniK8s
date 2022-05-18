@@ -13,15 +13,17 @@ use serde::Deserialize;
 mod etcd;
 mod handler;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ServerConfig {
     log_level: String,
     etcd: EtcdConfig,
+    metrics_server: String,
 }
 
 pub struct AppState {
     etcd_pool: etcd::EtcdPool,
     service_ip_pool: DashSet<Ipv4Addr>,
+    config: ServerConfig,
 }
 
 #[tokio::main]
@@ -81,14 +83,22 @@ async fn main() -> Result<()> {
                     .delete(handler::service::delete),
             ),
     );
+
     #[rustfmt::skip]
-        let watch_routes = Router::new().nest(
+    let watch_routes = Router::new().nest(
         "/watch",
         Router::new()
             .route("/nodes", get(handler::node::watch_all))
             .route("/pods", get(handler::pod::watch_all))
             .route("/replicasets", get(handler::replica_set::watch_all))
             .route("/services", get(handler::service::watch_all)),
+    );
+
+    #[rustfmt::skip]
+    let metrics_routes = Router::new().nest(
+        "/metrics",
+        Router::new()
+            .route("/pods", get(handler::metrics::list))
     );
 
     let app = Router::new()
@@ -99,6 +109,7 @@ async fn main() -> Result<()> {
                 .merge(rs_routes)
                 .merge(service_routes)
                 .merge(watch_routes)
+                .merge(metrics_routes)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),
         )
@@ -125,6 +136,7 @@ impl AppState {
         Ok(AppState {
             etcd_pool: pool,
             service_ip_pool: DashSet::new(),
+            config: (*config).to_owned(),
         })
     }
 }
