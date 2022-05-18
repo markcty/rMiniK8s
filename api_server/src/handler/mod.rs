@@ -3,6 +3,7 @@ use resources::models::ErrResponse;
 use crate::{etcd::EtcdClient, AppState};
 
 pub mod binding;
+pub mod hpa;
 pub mod metrics;
 pub mod node;
 pub mod pod;

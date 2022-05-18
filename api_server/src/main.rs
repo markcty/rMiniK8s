@@ -85,13 +85,29 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
+    let hpa_routes = Router::new().nest(
+        "/horizontalpodautoscalers",
+        Router::new()
+            .route("/",
+                   get(handler::hpa::list)
+                       .post(handler::hpa::create))
+            .route("/:name",
+                   get(handler::hpa::get)
+                       .put(handler::hpa::update)
+                       .patch(handler::hpa::patch)
+                       .delete(handler::hpa::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
     let watch_routes = Router::new().nest(
         "/watch",
         Router::new()
             .route("/nodes", get(handler::node::watch_all))
             .route("/pods", get(handler::pod::watch_all))
             .route("/replicasets", get(handler::replica_set::watch_all))
-            .route("/services", get(handler::service::watch_all)),
+            .route("/services", get(handler::service::watch_all))
+            .route("/horizontalpodautoscalers", get(handler::hpa::watch_all)),
     );
 
     #[rustfmt::skip]
@@ -108,6 +124,7 @@ async fn main() -> Result<()> {
                 .merge(pod_routes)
                 .merge(rs_routes)
                 .merge(service_routes)
+                .merge(hpa_routes)
                 .merge(watch_routes)
                 .merge(metrics_routes)
                 .route("/nodes", get(handler::node::list))
