@@ -78,11 +78,12 @@ pub trait Object:
 
 impl Object for KubeObject {
     fn uri(&self) -> String {
-        format!(
-            "/api/v1/{}s/{}",
-            self.kind().to_lowercase(),
-            self.name().to_lowercase()
-        )
+        let kind_prural = if self.kind() == "ingress" {
+            "ingresses".to_string()
+        } else {
+            self.kind()
+        };
+        format!("/api/v1/{}/{}", kind_prural, self.name().to_lowercase())
     }
 }
 

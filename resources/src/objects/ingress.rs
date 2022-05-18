@@ -16,7 +16,7 @@ pub struct IngressRule {
     /// Host is the fully qualified domain name of a network host.
     /// It should always end with .minik8s.com
     /// Host is automatically generated if not specified
-    pub host: String,
+    pub host: Option<String>,
     /// A collection of paths that map requests to services.
     pub paths: Vec<IngressPath>,
 }
@@ -34,5 +34,5 @@ pub struct IngressService {
     /// Name is the referenced service. The service must exist in the same namespace as the Ingress object.
     pub name: String,
     /// Port of the referenced service. A port number is required for a IngressServiceBackend.
-    pub service: u16,
+    pub port: u16,
 }

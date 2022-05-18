@@ -81,14 +81,30 @@ async fn main() -> Result<()> {
                     .delete(handler::service::delete),
             ),
     );
+
     #[rustfmt::skip]
-        let watch_routes = Router::new().nest(
+    let ingress_route = Router::new().nest(
+        "/ingresses",
+        Router::new()
+            .route("/", get(handler::ingress::list))
+            .route(
+                "/:name",
+                post(handler::ingress::create)
+                    .get(handler::ingress::get)
+                    .put(handler::ingress::update)
+                    .delete(handler::ingress::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
+    let watch_routes = Router::new().nest(
         "/watch",
         Router::new()
             .route("/nodes", get(handler::node::watch_all))
             .route("/pods", get(handler::pod::watch_all))
             .route("/replicasets", get(handler::replica_set::watch_all))
-            .route("/services", get(handler::service::watch_all)),
+            .route("/services", get(handler::service::watch_all))
+            .route("/ingress",get(handler::ingress::watch_all))
     );
 
     let app = Router::new()
@@ -98,6 +114,7 @@ async fn main() -> Result<()> {
                 .merge(pod_routes)
                 .merge(rs_routes)
                 .merge(service_routes)
+                .merge(ingress_route)
                 .merge(watch_routes)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),

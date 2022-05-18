@@ -146,3 +146,14 @@ pub fn gen_service_ip(app_state: &Arc<AppState>) -> Ipv4Addr {
         }
     }
 }
+
+pub fn gen_rand_host() -> String {
+    let mut rng = thread_rng();
+    let prefix = (&mut rng)
+        .sample_iter(Alphanumeric)
+        .take(5)
+        .map(char::from)
+        .collect::<String>()
+        .to_lowercase();
+    format!("{}.minik8s.com", prefix)
+}

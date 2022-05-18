@@ -91,18 +91,18 @@ impl NginxIngressConfig {
 }
 
 impl IngressHost {
-    pub fn new(host: String) -> Self {
+    pub fn new(host: &String) -> Self {
         Self {
-            host,
+            host: host.to_owned(),
             paths: vec![],
         }
     }
 
-    pub fn add_path(&mut self, path: String, svc_ip: Ipv4Addr, svc_port: u16) {
+    pub fn add_path(&mut self, path: &String, svc_ip: &Ipv4Addr, svc_port: &u16) {
         self.paths.push(IngressPath {
-            path,
-            ip: svc_ip,
-            port: svc_port,
+            path: path.to_owned(),
+            ip: svc_ip.to_owned(),
+            port: svc_port.to_owned(),
         });
     }
 }
