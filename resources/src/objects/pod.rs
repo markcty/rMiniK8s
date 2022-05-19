@@ -5,7 +5,7 @@ use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-use super::Metadata;
+use super::{metrics, Metadata};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pod {
@@ -22,6 +22,14 @@ impl Pod {
                 .map_or(false, |condition| condition.status),
             None => false,
         }
+    }
+
+    pub fn requests(&self, resource: &metrics::Resource) -> i64 {
+        self.spec
+            .containers
+            .iter()
+            .map(|container| container.requests(resource))
+            .sum()
     }
 }
 
@@ -84,6 +92,15 @@ pub struct Container {
     /// Compute Resources required by this container. Cannot be updated.
     #[serde(default)]
     pub resources: ResourceRequirements,
+}
+
+impl Container {
+    pub fn requests(&self, resource: &metrics::Resource) -> i64 {
+        match resource {
+            metrics::Resource::CPU => self.resources.requests.cpu,
+            metrics::Resource::Memory => self.resources.requests.memory,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

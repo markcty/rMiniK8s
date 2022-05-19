@@ -8,6 +8,8 @@ use uuid::Uuid;
 use self::object_reference::ObjectReference;
 
 pub mod binding;
+pub mod hpa;
+pub mod metrics;
 pub mod node;
 pub mod object_reference;
 pub mod pod;
@@ -29,6 +31,7 @@ pub enum KubeResource {
     Node(node::Node),
     Service(service::Service),
     ReplicaSet(replica_set::ReplicaSet),
+    HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
