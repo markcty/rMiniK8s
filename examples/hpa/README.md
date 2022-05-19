@@ -8,6 +8,7 @@
     - Pod Autoscaler
     - rKube-proxy
     - cAdvisor:
+
     ```shell
     docker run \
         --volume=/:/rootfs:ro \
@@ -17,8 +18,9 @@
         --publish=8090:8080 \
         --detach=true \
         --name=cadvisor \
-        google/cadvisor:latest
+        zcube/cadvisor:latest
     ```
+
     - Prometheus: `./prometheus --config.file=prometheus.yml`
 2. Apply ReplicaSet: `rkubectl create -f replicaset.yaml`
 3. Create Service: `rkubectl create -f service.yaml`

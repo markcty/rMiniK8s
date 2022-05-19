@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: php-apache
-          image: mirrorgooglecontainers/hpa-example:latest
+          image: hpa-example:latest
           ports:
             - containerPort: 80
           resources:
