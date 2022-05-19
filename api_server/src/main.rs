@@ -13,15 +13,17 @@ use serde::Deserialize;
 mod etcd;
 mod handler;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ServerConfig {
     log_level: String,
     etcd: EtcdConfig,
+    metrics_server: String,
 }
 
 pub struct AppState {
     etcd_pool: etcd::EtcdPool,
     service_ip_pool: DashSet<Ipv4Addr>,
+    config: ServerConfig,
 }
 
 #[tokio::main]
@@ -45,10 +47,11 @@ async fn main() -> Result<()> {
     let pod_routes = Router::new().nest(
         "/pods",
         Router::new()
-            .route("/", get(handler::pod::list))
+            .route("/",
+                   get(handler::pod::list)
+                       .post(handler::pod::create))
             .route("/:name",
-                   post(handler::pod::create)
-                       .get(handler::pod::get)
+                   get(handler::pod::get)
                        .put(handler::pod::replace)
                        .delete(handler::pod::delete),
             ),
@@ -58,10 +61,11 @@ async fn main() -> Result<()> {
     let rs_routes = Router::new().nest(
         "/replicasets",
         Router::new()
-            .route("/", get(handler::replica_set::list))
+            .route("/",
+                   get(handler::replica_set::list)
+                       .post(handler::replica_set::create))
             .route("/:name",
-                   post(handler::replica_set::create)
-                       .get(handler::replica_set::get)
+                   get(handler::replica_set::get)
                        .put(handler::replica_set::update)
                        .patch(handler::replica_set::patch)
                        .delete(handler::replica_set::delete),
@@ -72,13 +76,28 @@ async fn main() -> Result<()> {
     let service_routes = Router::new().nest(
         "/services",
         Router::new()
-            .route("/", get(handler::service::list))
-            .route(
-                "/:name",
-                post(handler::service::create)
-                    .get(handler::service::get)
-                    .put(handler::service::update)
-                    .delete(handler::service::delete),
+            .route("/",
+                   get(handler::service::list)
+                       .post(handler::service::create))
+            .route("/:name",
+                   get(handler::service::get)
+                       .put(handler::service::update)
+                       .delete(handler::service::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
+    let hpa_routes = Router::new().nest(
+        "/horizontalpodautoscalers",
+        Router::new()
+            .route("/",
+                   get(handler::hpa::list)
+                       .post(handler::hpa::create))
+            .route("/:name",
+                   get(handler::hpa::get)
+                       .put(handler::hpa::update)
+                       .patch(handler::hpa::patch)
+                       .delete(handler::hpa::delete),
             ),
     );
 
@@ -105,6 +124,14 @@ async fn main() -> Result<()> {
             .route("/replicasets", get(handler::replica_set::watch_all))
             .route("/services", get(handler::service::watch_all))
             .route("/ingresses",get(handler::ingress::watch_all))
+            .route("/horizontalpodautoscalers", get(handler::hpa::watch_all)),
+    );
+
+    #[rustfmt::skip]
+    let metrics_routes = Router::new().nest(
+        "/metrics",
+        Router::new()
+            .route("/pods", get(handler::metrics::list))
     );
 
     let app = Router::new()
@@ -115,7 +142,9 @@ async fn main() -> Result<()> {
                 .merge(rs_routes)
                 .merge(service_routes)
                 .merge(ingress_route)
+                .merge(hpa_routes)
                 .merge(watch_routes)
+                .merge(metrics_routes)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),
         )
@@ -142,6 +171,7 @@ impl AppState {
         Ok(AppState {
             etcd_pool: pool,
             service_ip_pool: DashSet::new(),
+            config: (*config).to_owned(),
         })
     }
 }

@@ -6,9 +6,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.56"
 axum = { version = "0.5.1", features = ["ws"] }
+chrono = "0.4.19"
 config = { version = "0.13.0", features = ["yaml"] }
 etcd-client = "0.9.0"
 lazy_static = "1.4.0"
+prometheus-http-api = "0.2.0"
 tokio = { version = "1.17.0", features = ["full"] }
 serde = { version = "1.0.136", features = ["derive"] }
 deadpool = { version = "0.9.3", features = ["rt_tokio_1"] }

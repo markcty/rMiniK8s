@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: php-apache
+  labels:
+    run: php-apache
+spec:
+  replicas: 1
+  selector:
+    run: php-apache
+  template:
+    metadata:
+      name: php-apache
+      labels:
+        run: php-apache
+    spec:
+      containers:
+        - name: php-apache
+          image: hpa-example:latest
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              cpu: 500
+            requests:
+              cpu: 200

@@ -18,8 +18,16 @@ path = "src/replica_set/main.rs"
 name = "ingress-controller"
 path = "src/ingress/main.rs"
 
+[[bin]]
+name = "podautoscaler"
+path = "src/podautoscaler/main.rs"
+
 [dependencies]
+chrono = "0.4.19"
 config = { version = "0.13.1", features = ["yaml"] }
+futures-delay-queue = "0.5.2"
+futures-intrusive = "0.4"
+parking_lot = "0.12.0"
 tokio = { version = "1.17.0", features = ["full"] }
 resources = { path = "../resources" }
 anyhow = { version = "1.0.56", features = ["backtrace"] }

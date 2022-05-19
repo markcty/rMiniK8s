@@ -18,7 +18,7 @@ use resources::objects::{
 };
 
 use crate::{
-    config::{CONTAINER_NAME_PREFIX, PAUSE_CONTAINER_NAME, PAUSE_IMAGE_NAME, POD_DIR_PATH},
+    config::{CONTAINER_NAME_PREFIX, PAUSE_IMAGE_NAME, POD_DIR_PATH, SANDBOX_NAME},
     docker::{Container, Image},
     volume::Volume,
 };
@@ -57,8 +57,8 @@ impl Pod {
             create_dir_all(pod.dir())
                 .with_context(|| format!("Failed to create pod directory for {}", name))?;
 
-            let pause_container = pod.create_pause_container().await?;
-            pod.create_containers(&pause_container).await?;
+            let sandbox = pod.create_sandbox().await?;
+            pod.create_containers(&sandbox).await?;
             pod.update_status().await?;
 
             Ok(pod)
@@ -99,10 +99,10 @@ impl Pod {
     async fn create_container(
         &self,
         container: &pod::Container,
-        pause_container: &Container,
+        sandbox: &Container,
     ) -> Result<Container> {
         let image = Image::create(&container.image).await;
-        let mode = Some(format!("container:{}", pause_container.id()));
+        let mode = Some(format!("container:{}", sandbox.id()));
 
         let volumes = self.create_volumes()?;
         let binds = self.bind_mounts(&volumes, &container.volume_mounts)?;
@@ -117,37 +117,57 @@ impl Pod {
             restart_policy: Some((&self.spec.restart_policy).into()),
             ..Default::default()
         });
+        let mut labels = self.container_labels();
+        labels.insert(
+            format!("{}.container.name", CONTAINER_NAME_PREFIX),
+            container.name.to_owned(),
+        );
+        labels.insert(
+            format!("{}.container.type", CONTAINER_NAME_PREFIX),
+            "container".to_string(),
+        );
         let config = Config {
             image: Some(image.name().to_owned()),
             entrypoint: Some(container.command.to_owned()),
             host_config,
+            labels: Some(labels),
             ..Default::default()
         };
         let name = Some(self.unique_container_name(&container.name));
         Container::create(name, config).await
     }
 
-    async fn create_containers(&self, pause_container: &Container) -> Result<Vec<Container>> {
+    async fn create_containers(&self, sandbox: &Container) -> Result<Vec<Container>> {
         let mut tasks = vec![];
         for container in &self.spec.containers {
-            tasks.push(self.create_container(container, pause_container));
+            tasks.push(self.create_container(container, sandbox));
         }
         try_join_all(tasks).await
     }
 
-    async fn create_pause_container(&self) -> Result<Container> {
+    async fn create_sandbox(&self) -> Result<Container> {
         let image = Image::create(PAUSE_IMAGE_NAME).await;
         let host_config = Some(HostConfig {
             network_mode: Some(self.spec.network_mode()),
             ipc_mode: Some("shareable".to_string()),
             ..Default::default()
         });
+        let mut labels = self.container_labels();
+        labels.insert(
+            format!("{}.container.name", CONTAINER_NAME_PREFIX),
+            SANDBOX_NAME.to_owned(),
+        );
+        labels.insert(
+            format!("{}.container.type", CONTAINER_NAME_PREFIX),
+            "podsandbox".to_string(),
+        );
         let config = Config {
             image: Some(image.name().to_owned()),
             host_config,
+            labels: Some(labels),
             ..Default::default()
         };
-        let name = Some(self.unique_container_name(PAUSE_CONTAINER_NAME));
+        let name = Some(self.unique_container_name(SANDBOX_NAME));
         let container = Container::create(name, config).await?;
         container.start().await?;
         Ok(container)
@@ -178,7 +198,7 @@ impl Pod {
         try_join_all(tasks)
             .await
             .with_context(|| "Failed to stop containers")?;
-        self.pause_container().stop().await?;
+        self.sandbox().stop().await?;
         Ok(())
     }
 
@@ -188,7 +208,7 @@ impl Pod {
         try_join_all(tasks)
             .await
             .with_context(|| "Failed to remove containers")?;
-        self.pause_container().remove().await?;
+        self.sandbox().remove().await?;
         Ok(())
     }
 
@@ -203,11 +223,10 @@ impl Pod {
 
     /// Update pod status, return true if pod status changed.
     pub async fn update_status(&mut self) -> Result<bool> {
-        let response = self.pause_container().inspect().await?;
+        let response = self.sandbox().inspect().await?;
         let pod_ip = Pod::get_ip(&response).map(|ip| ip.parse::<Ipv4Addr>().unwrap());
         let containers = self.inspect_containers().await?;
         let phase = self.compute_phase(&containers);
-        // TODO: strip uid off container names
         let container_statuses = containers
             .into_iter()
             .map(ContainerStatus::from)
@@ -265,8 +284,8 @@ impl Pod {
         )
     }
 
-    fn pause_container(&self) -> Container {
-        Container::new(self.unique_container_name(PAUSE_CONTAINER_NAME))
+    fn sandbox(&self) -> Container {
+        Container::new(self.unique_container_name(SANDBOX_NAME))
     }
 
     fn containers(&self) -> Vec<Container> {
@@ -366,5 +385,18 @@ impl Pod {
             },
         );
         conditions
+    }
+
+    fn container_labels(&self) -> HashMap<String, String> {
+        let mut labels = self.metadata.labels.0.to_owned();
+        labels.insert(
+            format!("{}.pod.name", CONTAINER_NAME_PREFIX),
+            self.metadata.name.to_owned(),
+        );
+        labels.insert(
+            format!("{}.pod.uid", CONTAINER_NAME_PREFIX),
+            self.metadata.uid.unwrap().to_string(),
+        );
+        labels
     }
 }

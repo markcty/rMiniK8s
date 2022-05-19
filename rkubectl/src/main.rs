@@ -55,6 +55,7 @@ enum ResourceKind {
     ReplicaSets,
     Services,
     Ingresses,
+    HorizontalPodAutoscalers,
 }
 
 fn main() -> Result<()> {

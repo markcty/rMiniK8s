@@ -1,4 +1,6 @@
 use anyhow::Result;
+use chrono::{Local, NaiveDateTime};
+use chrono_humanize::{Accuracy, HumanTime, Tense};
 use resources::objects::Object;
 
 use crate::{objects::KubeObject, Url, CONFIG};
@@ -17,4 +19,9 @@ pub fn gen_url(kind: String, name: Option<&String>) -> Result<Url> {
         format!("api/v1/{}", kind)
     };
     Ok(url.join(path.as_str())?)
+}
+
+pub fn calc_age(time: NaiveDateTime) -> String {
+    let d = HumanTime::from(Local::now().naive_utc() - time);
+    d.to_text_en(Accuracy::Rough, Tense::Present)
 }

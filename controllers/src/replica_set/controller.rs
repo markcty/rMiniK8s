@@ -79,7 +79,7 @@ impl ReplicaSetController {
         rs_informer.unwrap().await??;
         let pod_informer = std::mem::replace(&mut self.pod_informer, None);
         pod_informer.unwrap().await??;
-        tracing::info!("ReplicaSet Controller exitted");
+        tracing::info!("ReplicaSet Controller exited");
         Ok(())
     }
 
@@ -224,10 +224,7 @@ impl ReplicaSetController {
             }),
         };
         let response = client
-            .post(format!(
-                "{}/api/v1/pods/{}",
-                CONFIG.api_server_url, pod.metadata.name
-            ))
+            .post(format!("{}/api/v1/pods", CONFIG.api_server_url))
             .json(&pod)
             .send()
             .await?
