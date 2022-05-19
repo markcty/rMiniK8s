@@ -1,35 +1,44 @@
-use std::sync::Arc;
-
 use anyhow::Result;
-use resources::models::Response;
-use tokio::{sync::Mutex, time::sleep};
+use resources::{informer::Store, models::Response, objects::KubeObject};
+use tokio::time::sleep;
 
-use crate::{config::CONFIG, pod::Pod, pod_manager::PodManager};
+use crate::{config::CONFIG, pod::Pod, PodList};
 
 pub struct StatusManager {
-    pod_manager: Arc<Mutex<PodManager>>,
+    pods: PodList,
+    pod_store: Store<KubeObject>,
 }
 
 impl StatusManager {
-    pub fn new(pod_manager: Arc<Mutex<PodManager>>) -> Self {
+    pub fn new(pods: PodList, pod_store: Store<KubeObject>) -> Self {
         Self {
-            pod_manager,
+            pods,
+            pod_store,
         }
     }
 
     pub async fn run(&mut self) -> Result<()> {
         tracing::info!("Status manager started");
         loop {
-            for mut p in self.pod_manager.lock().await.iter_mut() {
-                let pod = p.value_mut();
-                let name = pod.metadata().name.to_owned();
+            let store = self.pods.read().await;
+            for name in store.iter() {
+                let store = self.pod_store.read().await;
+                let pod = store.get(&format!("/api/v1/pods/{}", name));
+                if pod.is_none() {
+                    tracing::warn!("Pod {} not found", name);
+                    drop(store);
+                    continue;
+                }
+                let mut pod = Pod::load(pod.unwrap().to_owned())?;
+                drop(store);
+
                 let changed = pod.update_status().await.unwrap_or_else(|err| {
                     tracing::error!("Failed to update status for pod {}: {:#?}", name, err);
                     false
                 });
                 if changed {
                     tracing::info!("Pod {} status changed", name);
-                    let res = self.post_status(pod).await;
+                    let res = self.post_status(&pod).await;
                     match res {
                         Ok(_) => {
                             tracing::info!("Posted status for pod {}", name);
@@ -40,6 +49,7 @@ impl StatusManager {
                     }
                 }
             }
+            drop(store);
             sleep(std::time::Duration::from_secs(
                 CONFIG.pod_status_update_frequency,
             ))

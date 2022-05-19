@@ -31,17 +31,21 @@ pub struct Pod {
 }
 
 impl Pod {
-    #[allow(dead_code)]
-    pub fn load(object: KubeObject) -> Self {
+    pub fn load(object: KubeObject) -> Result<Self> {
         if let KubeResource::Pod(resource) = object.resource {
-            let status = resource.status.expect("[Pod::load] Status is missing");
-            Pod {
+            let status = resource
+                .status
+                .with_context(|| "[Pod::load] Status is missing")?;
+            Ok(Pod {
                 metadata: object.metadata,
                 spec: resource.spec,
                 status,
-            }
+            })
         } else {
-            panic!("Expecting Pod, received {:?}", object.resource);
+            Err(anyhow::anyhow!(
+                "Expecting Pod, received {:?}",
+                object.resource
+            ))
         }
     }
 

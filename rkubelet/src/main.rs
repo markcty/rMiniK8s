@@ -1,28 +1,31 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Error, Result};
 use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, WsStream},
+    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
     models::Response,
     objects::KubeObject,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::connect_async;
 
 use crate::{
-    config::CONFIG, models::PodUpdate, pod_manager::PodManager, pod_worker::PodWorker,
-    status_manager::StatusManager,
+    config::CONFIG, models::PodUpdate, pod_worker::PodWorker, status_manager::StatusManager,
 };
 
 mod config;
 mod docker;
 mod models;
 mod pod;
-mod pod_manager;
 mod pod_worker;
 mod status_manager;
 mod volume;
+
+pub type PodList = Arc<RwLock<HashSet<String>>>;
+
+#[derive(Debug)]
+pub struct ResyncNotification;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -82,19 +85,26 @@ async fn main() -> Result<()> {
             })
         }),
     };
+    let (resync_tx, resync_rx) = mpsc::channel::<ResyncNotification>(16);
+    let rh = ResyncHandler(Box::new(move |()| {
+        let resync_tx = resync_tx.clone();
+        Box::pin(async move {
+            resync_tx.send(ResyncNotification).await?;
+            Ok(())
+        })
+    }));
 
     // Start the informer
-    let informer = Informer::new(lw, eh);
+    let informer = Informer::new(lw, eh, rh);
+    let pod_store = informer.get_store();
     let informer_handle = tokio::spawn(async move { informer.run().await });
 
-    let pm = Arc::new(Mutex::new(PodManager::new()));
-    let pm_sm = Arc::clone(&pm);
-
+    let pods: PodList = Arc::new(RwLock::new(HashSet::new()));
     // Start pod worker
-    let mut pod_worker = PodWorker::new(pm);
+    let mut pod_worker = PodWorker::new(pods.clone(), pod_store.clone(), resync_rx);
     let pod_worker_handle = tokio::spawn(async move { pod_worker.run(rx).await });
 
-    let mut status_manager = StatusManager::new(pm_sm);
+    let mut status_manager = StatusManager::new(pods, pod_store);
     let status_manager_handle = tokio::spawn(async move { status_manager.run().await });
 
     status_manager_handle.await?.expect("Status manager failed");
