@@ -2,13 +2,16 @@ use std::{net::Ipv4Addr, sync::Arc};
 
 use anyhow::{Context, Result};
 use axum::{
-    routing::{get, post},
+    http::StatusCode,
+    routing::{get, get_service, post},
     Extension, Router,
 };
 use config::Config;
 use dashmap::DashSet;
 use etcd::EtcdConfig;
 use serde::Deserialize;
+use tokio::fs;
+use tower_http::services::ServeDir;
 
 mod etcd;
 mod handler;
@@ -134,6 +137,16 @@ async fn main() -> Result<()> {
             .route("/pods", get(handler::metrics::list))
     );
 
+    // tmp file server
+    fs::create_dir_all("/tmp/minik8s").await?;
+    let tmp_file_service =
+        get_service(ServeDir::new("/tmp/minik8s")).handle_error(|error| async move {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Unhandled internal error: {}", error),
+            )
+        });
+
     let app = Router::new()
         .nest(
             "/api/v1",
@@ -145,6 +158,7 @@ async fn main() -> Result<()> {
                 .merge(hpa_routes)
                 .merge(watch_routes)
                 .merge(metrics_routes)
+                .nest("/tmp", tmp_file_service)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),
         )

@@ -24,3 +24,4 @@ futures = "0.3.21"
 uuid = { version = "0.8", features = ["v4"] }
 rand = "0.8.5"
 dashmap = "5.3.3"
+tower-http = { version = "0.3.3", features = ["fs"] }
