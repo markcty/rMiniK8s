@@ -7,7 +7,7 @@ use bollard::{
     image::{CreateImageOptions, ListImagesOptions},
     models::ContainerInspectResponse,
 };
-use futures::{future::try_join_all, StreamExt};
+use futures::{future::join_all, StreamExt};
 use resources::objects::pod::{ContainerStatus, ImagePullPolicy};
 use serde::Serialize;
 
@@ -188,19 +188,37 @@ impl From<&ContainerStatus> for Container {
 }
 
 /// Start docker containers concurrently
-pub async fn start_containers(containers: &[Container]) -> Result<()> {
+pub async fn start_containers(containers: &[Container]) -> Vec<Result<()>> {
     let tasks = containers.iter().map(|c| c.start()).collect::<Vec<_>>();
-    try_join_all(tasks)
-        .await
-        .with_context(|| "Failed to start containers")
-        .map(|_| ())
+    let results = join_all(tasks).await;
+    results.iter().for_each(|r| {
+        if let Err(e) = r {
+            tracing::error!("Failed to start container: {:#}", e);
+        }
+    });
+    results
+}
+
+/// Stop docker containers concurrently
+pub async fn stop_containers(containers: &[Container]) -> Vec<Result<()>> {
+    let tasks = containers.iter().map(|c| c.stop()).collect::<Vec<_>>();
+    let results = join_all(tasks).await;
+    results.iter().for_each(|r| {
+        if let Err(e) = r {
+            tracing::error!("Failed to stop container: {:#}", e);
+        }
+    });
+    results
 }
 
 /// Remove docker containers concurrently
-pub async fn remove_containers(containers: &[Container]) -> Result<()> {
+pub async fn remove_containers(containers: &[Container]) -> Vec<Result<bool>> {
     let tasks = containers.iter().map(|c| c.remove()).collect::<Vec<_>>();
-    try_join_all(tasks)
-        .await
-        .with_context(|| "Failed to remove containers")
-        .map(|_| ())
+    let results = join_all(tasks).await;
+    results.iter().for_each(|r| {
+        if let Err(e) = r {
+            tracing::error!("Failed to remove container: {:#}", e);
+        }
+    });
+    results
 }

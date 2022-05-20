@@ -7,14 +7,17 @@ use bollard::{
     container::Config,
     models::{ContainerInspectResponse, HostConfig},
 };
-use futures::future::try_join_all;
-use resources::objects::{
-    pod,
-    pod::{
-        ContainerState, ContainerStatus, ImagePullPolicy, PodCondition, PodConditionType, PodPhase,
-        PodSpec, PodStatus, RestartPolicy, VolumeMount,
+use futures::future::join_all;
+use resources::{
+    objects::{
+        pod,
+        pod::{
+            ContainerState, ContainerStatus, ImagePullPolicy, PodCondition, PodConditionType,
+            PodPhase, PodSpec, PodStatus, RestartPolicy, VolumeMount,
+        },
+        KubeObject, KubeResource, Metadata,
     },
-    KubeObject, KubeResource, Metadata,
+    utils::first_error_or_ok,
 };
 
 use crate::{
@@ -88,9 +91,8 @@ impl Pod {
             .iter()
             .map(Container::from)
             .collect::<Vec<Container>>();
-        docker::start_containers(&containers)
-            .await
-            .map(|_| tracing::info!("Pod {} created", self.metadata.name))
+        let results = docker::start_containers(&containers).await;
+        first_error_or_ok(results).map(|_| tracing::info!("Pod {} created", self.metadata.name))
     }
 
     pub async fn stop(&self) -> Result<()> {
@@ -102,7 +104,9 @@ impl Pod {
 
     pub async fn remove(&self) -> Result<()> {
         tracing::info!("Removing pod {}...", self.metadata.name);
-        self.stop().await?;
+        if let Err(err) = self.stop().await {
+            tracing::error!("Failed to stop pod: {:#}", err);
+        }
         self.remove_containers()
             .await
             .map(|_| tracing::info!("Pod {} removed", self.metadata.name))
@@ -156,11 +160,19 @@ impl Pod {
 
     /// Create pod containers
     async fn create_containers(&self, sandbox: &Container) -> Result<Vec<Container>> {
-        let mut tasks = vec![];
-        for container in &self.spec.containers {
-            tasks.push(self.create_container(container, sandbox));
-        }
-        try_join_all(tasks).await
+        let tasks = self
+            .spec
+            .containers
+            .iter()
+            .map(|c| self.create_container(c, sandbox))
+            .collect::<Vec<_>>();
+        let results = join_all(tasks).await;
+        results.iter().for_each(|r| {
+            if let Err(e) = r {
+                tracing::error!("Failed to create pod container: {:#}", e);
+            }
+        });
+        Ok(results.into_iter().filter_map(|r| r.ok()).collect())
     }
 
     async fn create_sandbox(&self) -> Result<Container> {
@@ -211,42 +223,46 @@ impl Pod {
         containers: &[pod::Container],
         sandbox: &Container,
     ) -> Result<()> {
-        let mut tasks = vec![];
-        for container in containers {
-            tasks.push(self.start_container(container, sandbox));
-        }
-        try_join_all(tasks)
-            .await
-            .with_context(|| "Failed to start containers")
-            .map(|_| ())
+        let tasks = containers
+            .iter()
+            .map(|c| self.start_container(c, sandbox))
+            .collect::<Vec<_>>();
+        let results = join_all(tasks).await;
+        results.iter().for_each(|r| {
+            if let Err(e) = r {
+                tracing::error!("Failed to start container: {:#}", e);
+            }
+        });
+        first_error_or_ok(results)
     }
 
     /// Inspect all pod containers
     async fn inspect_containers(&self) -> Result<Vec<Option<ContainerInspectResponse>>> {
         let containers = self.containers();
         let tasks = containers.iter().map(|c| c.inspect()).collect::<Vec<_>>();
-        try_join_all(tasks)
-            .await
-            .with_context(|| "Failed to inspect containers")
+        let results = join_all(tasks).await;
+        results.iter().for_each(|r| {
+            if let Err(e) = r {
+                tracing::error!("Failed to inspect container: {:#}", e);
+            }
+        });
+        Ok(results.into_iter().filter_map(|r| r.ok()).collect())
     }
 
     /// Stop all pod containers
     async fn stop_containers(&self) -> Result<()> {
         let containers = self.containers();
-        let tasks = containers.iter().map(|c| c.stop()).collect::<Vec<_>>();
-        try_join_all(tasks)
-            .await
-            .with_context(|| "Failed to stop containers")?;
+        let results = docker::stop_containers(&containers).await;
         self.sandbox().stop().await?;
-        Ok(())
+        first_error_or_ok(results)
     }
 
     /// Remove all pod containers
     async fn remove_containers(&self) -> Result<()> {
         let containers = self.containers();
-        docker::remove_containers(&containers).await?;
+        let results = docker::remove_containers(&containers).await;
         self.sandbox().remove().await?;
-        Ok(())
+        first_error_or_ok(results)
     }
 
     fn create_volumes(&self) -> Result<HashMap<String, Volume>> {
@@ -440,7 +456,7 @@ impl Pod {
 
     pub async fn reconcile(&self) -> Result<()> {
         let actions = self.compute_pod_actions().await;
-        docker::remove_containers(&actions.containers_to_remove).await?;
+        docker::remove_containers(&actions.containers_to_remove).await;
         let sandbox = if actions.create_sandbox {
             self.create_sandbox().await?
         } else {
