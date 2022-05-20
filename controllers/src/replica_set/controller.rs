@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 use anyhow::{Context, Error, Result};
 use resources::{
@@ -12,19 +15,24 @@ use resources::{
     },
 };
 use tokio::{
+    select,
     sync::{mpsc, mpsc::Receiver},
     task::JoinHandle,
 };
 
 use crate::{
-    utils::{create_informer, unwrap_pod, unwrap_rs, unwrap_rs_mut, Event},
+    utils::{create_informer, unwrap_pod, unwrap_rs, unwrap_rs_mut, Event, ResyncNotification},
     CONFIG,
 };
 
 pub struct ReplicaSetController {
     rx: Receiver<Event>,
+
+    rs_resync_rx: Receiver<ResyncNotification>,
     rs_informer: Option<JoinHandle<Result<(), Error>>>,
     rs_store: Store<KubeObject>,
+
+    pod_resync_rx: Receiver<ResyncNotification>,
     pod_informer: Option<JoinHandle<Result<(), Error>>>,
     pod_store: Store<KubeObject>,
 }
@@ -32,9 +40,13 @@ pub struct ReplicaSetController {
 impl ReplicaSetController {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel::<Event>(16);
-        let rs_informer = create_informer("replicasets".to_string(), tx.clone());
+
+        let (rs_resync_tx, rs_resync_rx) = mpsc::channel::<ResyncNotification>(16);
+        let rs_informer = create_informer("replicasets".to_string(), tx.clone(), rs_resync_tx);
         let rs_store = rs_informer.get_store();
-        let pod_informer = create_informer("pods".to_string(), tx);
+
+        let (pod_resync_tx, pod_resync_rx) = mpsc::channel::<ResyncNotification>(16);
+        let pod_informer = create_informer("pods".to_string(), tx, pod_resync_tx);
         let pod_store = pod_informer.get_store();
 
         let rs_informer = tokio::spawn(async move { rs_informer.run().await });
@@ -42,8 +54,12 @@ impl ReplicaSetController {
 
         Self {
             rx,
+
+            rs_resync_rx,
             rs_informer: Some(rs_informer),
             rs_store,
+
+            pod_resync_rx,
             pod_informer: Some(pod_informer),
             pod_store,
         }
@@ -52,26 +68,36 @@ impl ReplicaSetController {
     pub async fn run(&mut self) -> Result<()> {
         tracing::info!("ReplicaSet Controller started");
 
-        while let Some(event) = self.rx.recv().await {
-            let result = match event {
-                Event::Add(object) => match object.resource {
-                    KubeResource::ReplicaSet(_) => self.tune_replicaset(&object).await,
-                    KubeResource::Pod(_) => self.handle_pod_add(object).await,
-                    _ => Err(anyhow::anyhow!("Unexpected resource {}", object.kind())),
+        loop {
+            select! {
+                Some(event) = self.rx.recv() => {
+                    let result = match event {
+                        Event::Add(object) => match object.resource {
+                            KubeResource::ReplicaSet(_) => self.reconcile(&object).await,
+                            KubeResource::Pod(_) => self.handle_pod_change(object).await,
+                            _ => Err(anyhow::anyhow!("Unexpected resource {}", object.kind())),
+                        },
+                        Event::Update(_, new_object) => match new_object.resource {
+                            KubeResource::ReplicaSet(_) => self.reconcile(&new_object).await,
+                            KubeResource::Pod(_) => self.handle_pod_change(new_object).await,
+                            _ => Err(anyhow::anyhow!("Unexpected resource {}", new_object.kind())),
+                        },
+                        Event::Delete(mut object) => match object.resource {
+                            KubeResource::ReplicaSet(ref mut rs) => {
+                                rs.spec.replicas = 0;
+                                self.reconcile(&object).await
+                            },
+                            KubeResource::Pod(_) => self.handle_pod_change(object).await,
+                            _ => Err(anyhow::anyhow!("Unexpected resource {}", object.kind())),
+                        },
+                    };
+                    if let Err(e) = result {
+                        tracing::error!("Error while processing: {:#?}", e);
+                    }
                 },
-                Event::Update(old_object, new_object) => match new_object.resource {
-                    KubeResource::ReplicaSet(_) => self.tune_replicaset(&new_object).await,
-                    KubeResource::Pod(_) => self.handle_pod_update(old_object, new_object).await,
-                    _ => Err(anyhow::anyhow!("Unexpected resource {}", new_object.kind())),
-                },
-                Event::Delete(object) => match object.resource {
-                    KubeResource::ReplicaSet(_) => Ok(()),
-                    KubeResource::Pod(_) => self.handle_pod_delete(object).await,
-                    _ => Err(anyhow::anyhow!("Unexpected resource {}", object.kind())),
-                },
-            };
-            if let Err(e) = result {
-                tracing::error!("Error while processing: {}", e);
+                _ = self.rs_resync_rx.recv() => self.resync_rs().await,
+                _ = self.pod_resync_rx.recv() => self.resync_pod().await,
+                else => break
             }
         }
 
@@ -83,43 +109,7 @@ impl ReplicaSetController {
         Ok(())
     }
 
-    async fn handle_pod_add(&self, object: KubeObject) -> Result<()> {
-        let name = object.metadata.name.to_owned();
-        let owner = self.resolve_owner(&object.metadata.owner_references).await;
-        match owner {
-            Some(ref owner) => {
-                self.update_replicaset(owner).await?;
-            },
-            None => tracing::debug!("Pod {} is not owned by any ReplicaSet", name),
-        };
-        Ok(())
-    }
-
-    async fn handle_pod_update(
-        &self,
-        old_object: KubeObject,
-        new_object: KubeObject,
-    ) -> Result<()> {
-        let old_pod = unwrap_pod(&old_object);
-        let new_pod = unwrap_pod(&new_object);
-        let name = new_object.metadata.name.to_owned();
-        let owner = self
-            .resolve_owner(&new_object.metadata.owner_references)
-            .await;
-        match owner {
-            Some(ref owner) => {
-                if !old_pod.is_ready() && new_pod.is_ready() {
-                    self.update_replicaset(owner).await?;
-                } else if old_pod.is_ready() && !new_pod.is_ready() {
-                    self.update_replicaset(owner).await?;
-                }
-            },
-            None => tracing::debug!("Pod {} is not owned by any ReplicaSet", name),
-        };
-        Ok(())
-    }
-
-    async fn handle_pod_delete(&self, object: KubeObject) -> Result<()> {
+    async fn handle_pod_change(&self, object: KubeObject) -> Result<()> {
         let name = object.metadata.name.to_owned();
         let owner = self.resolve_owner(&object.metadata.owner_references).await;
         match owner {
@@ -155,7 +145,7 @@ impl ReplicaSetController {
         Ok(())
     }
 
-    async fn tune_replicaset(&self, object: &KubeObject) -> Result<()> {
+    async fn reconcile(&self, object: &KubeObject) -> Result<()> {
         let rs = unwrap_rs(object);
         let status = rs
             .status
@@ -322,5 +312,39 @@ impl ReplicaSetController {
             Ordering::Equal
         });
         pods[0].metadata.name.to_owned()
+    }
+
+    async fn resync_rs(&self) {
+        let store = self.rs_store.read().await;
+        for rs in store.values() {
+            let result = self.update_replicaset(rs).await;
+            if let Err(e) = result {
+                tracing::error!("Failed to update ReplicaSet {}: {:#?}", rs.metadata.name, e);
+            }
+        }
+    }
+
+    async fn resync_pod(&self) {
+        let mut rs_to_resync = HashSet::<String>::new();
+        let store = self.pod_store.read().await;
+        for pod in store.values() {
+            let owner = self.resolve_owner(&pod.metadata.owner_references).await;
+            match owner {
+                Some(owner) => {
+                    if !rs_to_resync.contains(&owner.metadata.name) {
+                        rs_to_resync.insert(owner.metadata.name.to_owned());
+                        let result = self.update_replicaset(&owner).await;
+                        if let Err(e) = result {
+                            tracing::error!(
+                                "Failed to update ReplicaSet {}: {:#?}",
+                                owner.metadata.name,
+                                e
+                            );
+                        }
+                    }
+                },
+                None => tracing::debug!("Pod {} is not owned by any ReplicaSet", pod.metadata.name),
+            };
+        }
     }
 }

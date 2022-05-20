@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Error};
 use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, WsStream},
+    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
     models::Response,
     objects::{pod::Pod, replica_set::ReplicaSet, KubeObject, KubeResource},
 };
@@ -16,6 +16,9 @@ pub enum Event {
     Update(KubeObject, KubeObject),
     Delete(KubeObject),
 }
+
+#[derive(Debug)]
+pub struct ResyncNotification;
 
 pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
     let list_url = format!("{}/api/v1/{}", CONFIG.api_server_url, path);
@@ -43,7 +46,11 @@ pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
     }
 }
 
-pub fn create_informer(path: String, tx: Sender<Event>) -> Informer<KubeObject> {
+pub fn create_informer(
+    path: String,
+    tx: Sender<Event>,
+    resync_tx: Sender<ResyncNotification>,
+) -> Informer<KubeObject> {
     let lw = create_lister_watcher(path);
 
     let tx_add = tx;
@@ -73,8 +80,15 @@ pub fn create_informer(path: String, tx: Sender<Event>) -> Informer<KubeObject> 
             })
         }),
     };
+    let rh = ResyncHandler(Box::new(move |()| {
+        let resync_tx = resync_tx.clone();
+        Box::pin(async move {
+            resync_tx.send(ResyncNotification).await?;
+            Ok(())
+        })
+    }));
 
-    Informer::new(lw, eh)
+    Informer::new(lw, eh, rh)
 }
 
 pub fn unwrap_rs(object: &KubeObject) -> &ReplicaSet {
