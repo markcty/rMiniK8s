@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.56"
-axum = { version = "0.5.1", features = ["ws"] }
+axum = { version = "0.5.1", features = ["ws", "multipart"] }
 chrono = "0.4.19"
 config = { version = "0.13.0", features = ["yaml"] }
 etcd-client = "0.9.0"
@@ -25,3 +25,4 @@ uuid = { version = "0.8", features = ["v4"] }
 rand = "0.8.5"
 dashmap = "5.3.3"
 tower-http = { version = "0.3.3", features = ["fs"] }
+tokio-util = "0.7.2"

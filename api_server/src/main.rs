@@ -16,6 +16,8 @@ use tower_http::services::ServeDir;
 mod etcd;
 mod handler;
 
+const TMP_DIR: &str = "/tmp/minik8s";
+
 #[derive(Debug, Clone, Deserialize)]
 struct ServerConfig {
     log_level: String,
@@ -105,6 +107,13 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
+    let func_routes = Router::new().nest(
+        "/func",
+        Router::new()
+            .route("/",post(handler::function::create))
+    );
+
+    #[rustfmt::skip]
     let ingress_route = Router::new().nest(
         "/ingresses",
         Router::new()
@@ -138,14 +147,13 @@ async fn main() -> Result<()> {
     );
 
     // tmp file server
-    fs::create_dir_all("/tmp/minik8s").await?;
-    let tmp_file_service =
-        get_service(ServeDir::new("/tmp/minik8s")).handle_error(|error| async move {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Unhandled internal error: {}", error),
-            )
-        });
+    fs::create_dir_all(TMP_DIR).await?;
+    let tmp_file_service = get_service(ServeDir::new(TMP_DIR)).handle_error(|error| async move {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Unhandled internal error: {}", error),
+        )
+    });
 
     let app = Router::new()
         .nest(
@@ -158,6 +166,7 @@ async fn main() -> Result<()> {
                 .merge(hpa_routes)
                 .merge(watch_routes)
                 .merge(metrics_routes)
+                .merge(func_routes)
                 .nest("/tmp", tmp_file_service)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),

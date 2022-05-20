@@ -1,13 +1,17 @@
-use std::{net::Ipv4Addr, sync::Arc};
+use std::{io, net::Ipv4Addr, path::PathBuf, sync::Arc};
 
+use axum::{body::Bytes, BoxError};
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
+use futures::{Stream, TryStreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use resources::{models::ErrResponse, objects::KubeObject};
 use serde::Serialize;
+use tokio::{fs::File, io::BufWriter};
+use tokio_util::io::StreamReader;
 
 use crate::{
     etcd::{self, kv_to_str},
-    AppState,
+    AppState, TMP_DIR,
 };
 
 pub async fn etcd_put(
@@ -156,4 +160,55 @@ pub fn gen_rand_host() -> String {
         .collect::<String>()
         .to_lowercase();
     format!("{}.minik8s.com", prefix)
+}
+
+fn unique_filename(filename: &str) -> PathBuf {
+    let mut rng = thread_rng();
+
+    let filename = PathBuf::from(filename);
+    let mut new_filename = filename.file_stem().unwrap_or_default().to_os_string();
+    new_filename.push(
+        (&mut rng)
+            .sample_iter(Alphanumeric)
+            .take(5)
+            .map(char::from)
+            .collect::<String>()
+            .as_str(),
+    );
+
+    let mut new_filename = PathBuf::from(new_filename);
+    if let Some(ext) = filename.extension() {
+        new_filename.set_extension(ext);
+    }
+    new_filename
+}
+
+pub async fn stream_to_tmp_file<S, E>(
+    original_filename: &str,
+    stream: S,
+) -> Result<String, ErrResponse>
+where
+    S: Stream<Item = Result<Bytes, E>>,
+    E: Into<BoxError>,
+{
+    async {
+        // Convert the stream into an `AsyncRead`.
+        let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+        let body_reader = StreamReader::new(body_with_io_error);
+        futures::pin_mut!(body_reader);
+
+        // add unique hash to filename
+        let file = unique_filename(original_filename);
+
+        // write file
+        let path = std::path::Path::new(TMP_DIR).join(&file);
+        let mut file_writer = BufWriter::new(File::create(path).await?);
+        tokio::io::copy(&mut body_reader, &mut file_writer).await?;
+
+        // return the new filename
+        tracing::info!("add new tmp file: {}", file.display());
+        Ok::<String, io::Error>(file.to_str().unwrap_or_default().to_string())
+    }
+    .await
+    .map_err(|err| ErrResponse::new(err.to_string(), None))
 }

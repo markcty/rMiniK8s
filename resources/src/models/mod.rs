@@ -50,6 +50,13 @@ impl ErrResponse {
             status: StatusCode::NOT_FOUND,
         }
     }
+    pub fn bad_request(msg: String, cause: Option<String>) -> Self {
+        Self {
+            msg,
+            cause,
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
 }
 
 impl IntoResponse for ErrResponse {
