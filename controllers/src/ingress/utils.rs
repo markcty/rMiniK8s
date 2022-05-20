@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher},
+    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler},
     models,
     objects::KubeObject,
 };
@@ -34,7 +34,7 @@ pub fn create_svc_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
     // create event handler closures
     let tx_add = tx.clone();
     let tx_update = tx.clone();
-    let tx_delete = tx;
+    let tx_delete = tx.clone();
     let eh = EventHandler {
         add_cls: Box::new(move |_| {
             let tx_add = tx_add.clone();
@@ -59,8 +59,16 @@ pub fn create_svc_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
         }),
     };
 
+    let rh = ResyncHandler(Box::new(move |_| {
+        let tx = tx.clone();
+        Box::pin(async move {
+            tx.send(Notification).await?;
+            Ok(())
+        })
+    }));
+
     // start the informer
-    Informer::new(lw, eh)
+    Informer::new(lw, eh, rh)
 }
 
 pub fn create_ingress_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
@@ -88,7 +96,7 @@ pub fn create_ingress_informer(tx: Sender<Notification>) -> Informer<KubeObject>
     // create event handler closures
     let tx_add = tx.clone();
     let tx_update = tx.clone();
-    let tx_delete = tx;
+    let tx_delete = tx.clone();
     let eh = EventHandler {
         add_cls: Box::new(move |_| {
             let tx_add = tx_add.clone();
@@ -113,6 +121,14 @@ pub fn create_ingress_informer(tx: Sender<Notification>) -> Informer<KubeObject>
         }),
     };
 
+    let rh = ResyncHandler(Box::new(move |_| {
+        let tx = tx.clone();
+        Box::pin(async move {
+            tx.send(Notification).await?;
+            Ok(())
+        })
+    }));
+
     // start the informer
-    Informer::new(lw, eh)
+    Informer::new(lw, eh, rh)
 }

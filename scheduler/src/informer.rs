@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Error};
 use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, Store, WsStream},
+    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store, WsStream},
     models,
     objects::KubeObject,
 };
@@ -70,8 +70,15 @@ pub fn run_pod_informer() -> RunInformerResult {
         }),
     };
 
+    // TODO: fill real logic
+    let rh = ResyncHandler(Box::new(move |_| {
+        Box::pin(async move {
+            tracing::debug!("Resync\n");
+            Ok(())
+        })
+    }));
     // start the informer
-    let informer = Informer::new(lw, eh);
+    let informer = Informer::new(lw, eh, rh);
     let store = informer.get_store();
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
@@ -125,8 +132,15 @@ pub fn run_node_informer() -> RunInformerResult {
         }),
     };
 
+    // TODO: fill real logic
+    let rh = ResyncHandler(Box::new(move |_| {
+        Box::pin(async move {
+            tracing::debug!("Resync\n");
+            Ok(())
+        })
+    }));
     // start the informer
-    let informer = Informer::new(lw, eh);
+    let informer = Informer::new(lw, eh, rh);
     let store = informer.get_store();
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
