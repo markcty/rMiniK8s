@@ -95,6 +95,7 @@ pub struct Labels(pub HashMap<String, String>);
 
 impl ToString for Labels {
     /// Returns a string representation of the labels.
+    ///
     /// The string is formatted as a comma-separated list of key=value pairs.
     /// If the map is empty, returns a empty string.
     ///
@@ -176,19 +177,19 @@ impl Labels {
     /// ```rust
     /// use resources::objects::Labels;
     ///
-    /// let labels1 = Labels::try_from("app=frontend,env=prod".to_string()).unwrap();
-    /// let labels2 = Labels::try_from("app=frontend".to_string()).unwrap();
+    /// let labels1 = Labels::try_from(&"app=frontend,env=prod".to_string()).unwrap();
+    /// let labels2 = Labels::try_from(&"app=frontend".to_string()).unwrap();
     /// assert!(labels1.matches(&labels2));
     ///
     /// let labels2 = Labels::new();
     /// assert!(labels1.matches(&labels2));
     ///
-    /// let labels1 = Labels::try_from("app=frontend,env=prod".to_string()).unwrap();
-    /// let labels2 = Labels::try_from("app=frontend,env=dev".to_string()).unwrap();
+    /// let labels1 = Labels::try_from(&"app=frontend,env=prod".to_string()).unwrap();
+    /// let labels2 = Labels::try_from(&"app=frontend,env=dev".to_string()).unwrap();
     /// assert!(!labels1.matches(&labels2));
     ///
-    /// let labels1 = Labels::try_from("app=frontend".to_string()).unwrap();
-    /// let labels2 = Labels::try_from("app=frontend,env=prod".to_string()).unwrap();
+    /// let labels1 = Labels::try_from(&"app=frontend".to_string()).unwrap();
+    /// let labels2 = Labels::try_from(&"app=frontend,env=prod".to_string()).unwrap();
     /// assert!(!labels1.matches(&labels2));
     /// ```
     pub fn matches(&self, labels: &Labels) -> bool {
