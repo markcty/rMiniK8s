@@ -3,9 +3,11 @@ use std::{cmp::Eq, default::Default, hash::Hash};
 use anyhow::{Context, Result};
 use bollard::{
     container::{Config, CreateContainerOptions, StartContainerOptions},
+    errors::Error::DockerResponseServerError,
     image::CreateImageOptions,
+    models::ContainerInspectResponse,
 };
-use futures::StreamExt;
+use futures::{future::try_join_all, StreamExt};
 use resources::objects::pod::ContainerStatus;
 use serde::Serialize;
 
@@ -90,11 +92,23 @@ impl Container {
             .with_context(|| format!("Failed to start container {}", self.id))
     }
 
-    pub async fn inspect(&self) -> Result<bollard::models::ContainerInspectResponse> {
-        DOCKER
-            .inspect_container(self.id.as_str(), None)
-            .await
-            .with_context(|| format!("Failed to inspect container {}", self.id))
+    /// Inspect a container, return `None` if not found
+    pub async fn inspect(&self) -> Result<Option<ContainerInspectResponse>> {
+        let response = DOCKER.inspect_container(self.id.as_str(), None).await;
+        match response {
+            Ok(response) => Ok(Some(response)),
+            Err(err) => {
+                if let DockerResponseServerError {
+                    status_code, ..
+                } = err
+                {
+                    if status_code.eq(&404) {
+                        return Ok(None);
+                    }
+                }
+                Err(err).with_context(|| format!("Failed to inspect container {}", self.id))
+            },
+        }
     }
 
     pub async fn stop(&self) -> Result<()> {
@@ -104,11 +118,23 @@ impl Container {
             .with_context(|| format!("Failed to stop container {}", self.id))
     }
 
-    pub async fn remove(&self) -> Result<()> {
-        DOCKER
-            .remove_container(self.id.as_str(), None)
-            .await
-            .with_context(|| format!("Failed to remove container {}", self.id))
+    /// Remove a container, return `true` if succeeded, `false` if not found
+    pub async fn remove(&self) -> Result<bool> {
+        let response = DOCKER.remove_container(self.id.as_str(), None).await;
+        match response {
+            Ok(_) => Ok(true),
+            Err(err) => {
+                if let DockerResponseServerError {
+                    status_code, ..
+                } = err
+                {
+                    if status_code.eq(&404) {
+                        return Ok(false);
+                    }
+                }
+                Err(err).with_context(|| format!("Failed to inspect container {}", self.id))
+            },
+        }
     }
 }
 
@@ -118,4 +144,22 @@ impl From<&ContainerStatus> for Container {
             id: status.container_id.to_owned(),
         }
     }
+}
+
+/// Start docker containers concurrently
+pub async fn start_containers(containers: &[Container]) -> Result<()> {
+    let tasks = containers.iter().map(|c| c.start()).collect::<Vec<_>>();
+    try_join_all(tasks)
+        .await
+        .with_context(|| "Failed to start containers")
+        .map(|_| ())
+}
+
+/// Remove docker containers concurrently
+pub async fn remove_containers(containers: &[Container]) -> Result<()> {
+    let tasks = containers.iter().map(|c| c.remove()).collect::<Vec<_>>();
+    try_join_all(tasks)
+        .await
+        .with_context(|| "Failed to remove containers")
+        .map(|_| ())
 }

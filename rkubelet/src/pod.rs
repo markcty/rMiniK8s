@@ -19,9 +19,18 @@ use resources::objects::{
 
 use crate::{
     config::{CONTAINER_NAME_PREFIX, PAUSE_IMAGE_NAME, POD_DIR_PATH, SANDBOX_NAME},
+    docker,
     docker::{Container, Image},
     volume::Volume,
 };
+
+#[derive(Debug)]
+struct PodActions {
+    pub create_sandbox: bool,
+    pub start_sandbox: bool,
+    pub containers_to_start: Vec<pod::Container>,
+    pub containers_to_remove: Vec<Container>,
+}
 
 #[derive(Debug)]
 pub struct Pod {
@@ -79,7 +88,7 @@ impl Pod {
             .iter()
             .map(Container::from)
             .collect::<Vec<Container>>();
-        self.start_containers(&containers)
+        docker::start_containers(&containers)
             .await
             .map(|_| tracing::info!("Pod {} created", self.metadata.name))
     }
@@ -100,6 +109,7 @@ impl Pod {
         // TODO: Remove pod directory (DANGEROUS!)
     }
 
+    /// Create a pod container
     async fn create_container(
         &self,
         container: &pod::Container,
@@ -141,6 +151,7 @@ impl Pod {
         Container::create(name, config).await
     }
 
+    /// Create pod containers
     async fn create_containers(&self, sandbox: &Container) -> Result<Vec<Container>> {
         let mut tasks = vec![];
         for container in &self.spec.containers {
@@ -177,10 +188,26 @@ impl Pod {
         Ok(container)
     }
 
-    async fn start_containers(&self, containers: &[Container]) -> Result<()> {
+    // Start a pod container, create it if doesn't exist
+    async fn start_container(&self, container: &pod::Container, sandbox: &Container) -> Result<()> {
+        let old_container = Container::new(self.unique_container_name(&container.name));
+        let result = old_container.inspect().await?;
+        let container = match result {
+            Some(_) => old_container,
+            None => self.create_container(container, sandbox).await?,
+        };
+        container.start().await
+    }
+
+    /// Start pod containers, create them if doesn't exist
+    async fn start_containers(
+        &self,
+        containers: &[pod::Container],
+        sandbox: &Container,
+    ) -> Result<()> {
         let mut tasks = vec![];
         for container in containers {
-            tasks.push(container.start());
+            tasks.push(self.start_container(container, sandbox));
         }
         try_join_all(tasks)
             .await
@@ -188,7 +215,8 @@ impl Pod {
             .map(|_| ())
     }
 
-    async fn inspect_containers(&self) -> Result<Vec<ContainerInspectResponse>> {
+    /// Inspect all pod containers
+    async fn inspect_containers(&self) -> Result<Vec<Option<ContainerInspectResponse>>> {
         let containers = self.containers();
         let tasks = containers.iter().map(|c| c.inspect()).collect::<Vec<_>>();
         try_join_all(tasks)
@@ -196,6 +224,7 @@ impl Pod {
             .with_context(|| "Failed to inspect containers")
     }
 
+    /// Stop all pod containers
     async fn stop_containers(&self) -> Result<()> {
         let containers = self.containers();
         let tasks = containers.iter().map(|c| c.stop()).collect::<Vec<_>>();
@@ -206,12 +235,10 @@ impl Pod {
         Ok(())
     }
 
+    /// Remove all pod containers
     async fn remove_containers(&self) -> Result<()> {
         let containers = self.containers();
-        let tasks = containers.iter().map(|c| c.remove()).collect::<Vec<_>>();
-        try_join_all(tasks)
-            .await
-            .with_context(|| "Failed to remove containers")?;
+        docker::remove_containers(&containers).await?;
         self.sandbox().remove().await?;
         Ok(())
     }
@@ -228,13 +255,17 @@ impl Pod {
     /// Update pod status, return true if pod status changed.
     pub async fn update_status(&mut self) -> Result<bool> {
         let response = self.sandbox().inspect().await?;
-        let pod_ip = Pod::get_ip(&response).map(|ip| ip.parse::<Ipv4Addr>().unwrap());
+        let pod_ip = response
+            .and_then(|r| Pod::get_ip(&r).map(|ip| ip.parse::<Ipv4Addr>().ok()))
+            .flatten();
         let containers = self.inspect_containers().await?;
-        let phase = self.compute_phase(&containers);
+        // Missing containers will be filtered out
         let container_statuses = containers
             .into_iter()
+            .flatten()
             .map(ContainerStatus::from)
             .collect::<Vec<_>>();
+        let phase = self.compute_phase(&container_statuses);
         // TODO: determine pod conditions
         let new_status = PodStatus {
             phase,
@@ -321,23 +352,20 @@ impl Pod {
         }
     }
 
-    fn compute_phase(&self, containers: &Vec<ContainerInspectResponse>) -> PodPhase {
+    fn compute_phase(&self, containers: &Vec<ContainerStatus>) -> PodPhase {
         let mut running = 0;
         let mut waiting = 0;
         let mut stopped = 0;
         let mut succeeded = 0;
         for container in containers {
-            let state = ContainerState::from(container.state.to_owned());
-            match state {
+            match container.state {
                 ContainerState::Running => running += 1,
-                ContainerState::Terminated => {
+                ContainerState::Terminated {
+                    exit_code,
+                } => {
                     stopped += 1;
-                    if let Some(exit_code) =
-                        container.state.to_owned().and_then(|state| state.exit_code)
-                    {
-                        if exit_code == 0 {
-                            succeeded += 1;
-                        }
+                    if exit_code == 0 {
+                        succeeded += 1;
                     }
                 },
                 ContainerState::Waiting => waiting += 1,
@@ -402,5 +430,101 @@ impl Pod {
             self.metadata.uid.unwrap().to_string(),
         );
         labels
+    }
+
+    pub async fn reconcile(&self) -> Result<()> {
+        let actions = self.compute_pod_actions().await;
+        docker::remove_containers(&actions.containers_to_remove).await?;
+        let sandbox = if actions.create_sandbox {
+            self.create_sandbox().await?
+        } else {
+            self.sandbox()
+        };
+        if actions.start_sandbox {
+            sandbox.start().await?;
+        }
+        self.start_containers(&actions.containers_to_start, &sandbox)
+            .await
+    }
+
+    async fn compute_pod_actions(&self) -> PodActions {
+        let mut actions = PodActions {
+            create_sandbox: false,
+            start_sandbox: false,
+            containers_to_start: vec![],
+            containers_to_remove: vec![],
+        };
+
+        let sandbox = self.sandbox();
+        let response = sandbox.inspect().await;
+        match response {
+            Ok(response) => {
+                match response {
+                    Some(response) => {
+                        // If sandbox is not running, restart it
+                        if let ContainerState::Terminated {
+                            ..
+                        } = ContainerState::from(response.state)
+                        {
+                            tracing::info!("Sandbox is not running, restarting...");
+                            actions.start_sandbox = true;
+                        }
+                    },
+                    // Sandbox doesn't exist, create it,
+                    // all containers need to be removeed and created
+                    None => {
+                        tracing::info!("Sandbox is missing, recreating...");
+                        actions.create_sandbox = true;
+                        actions.containers_to_remove.append(&mut self.containers());
+                        actions
+                            .containers_to_start
+                            .append(&mut self.spec.containers.clone());
+                        return actions;
+                    },
+                }
+            },
+            Err(_) => {
+                // Inspect error, assume sandbox is dead, remove and recreate it
+                actions.create_sandbox = true;
+                actions.containers_to_remove.push(sandbox);
+                actions.containers_to_remove.append(&mut self.containers());
+                actions
+                    .containers_to_start
+                    .append(&mut self.spec.containers.clone());
+                return actions;
+            },
+        }
+
+        for container in self.spec.containers.iter() {
+            let status = self
+                .status
+                .container_statuses
+                .iter()
+                .find(|status| status.name == container.name);
+            // If status was not found (container is missing) or container is not running
+            if status.map(|status| status.state == ContainerState::Running) != Some(true)
+                && self.should_restart_container(status)
+            {
+                tracing::info!("Container {} is not running, restarting...", container.name);
+                actions.containers_to_start.push(container.to_owned());
+            }
+        }
+        actions
+    }
+
+    fn should_restart_container(&self, status: Option<&ContainerStatus>) -> bool {
+        match status {
+            Some(status) => match status.state {
+                ContainerState::Running | ContainerState::Waiting => false,
+                ContainerState::Terminated {
+                    exit_code,
+                } => match self.spec.restart_policy {
+                    RestartPolicy::Always => true,
+                    RestartPolicy::Never => false,
+                    RestartPolicy::OnFailure => exit_code != 0,
+                },
+            },
+            None => true,
+        }
     }
 }

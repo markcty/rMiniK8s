@@ -55,7 +55,8 @@ async fn main() -> Result<()> {
     };
 
     // Create work queue and register event handler closures
-    let (tx_add, rx) = mpsc::channel::<PodUpdate>(16);
+    let (tx, rx) = mpsc::channel::<PodUpdate>(16);
+    let tx_add = tx.clone();
     let tx_update = tx_add.clone();
     let tx_delete = tx_add.clone();
     let eh = EventHandler::<KubeObject> {
@@ -101,7 +102,7 @@ async fn main() -> Result<()> {
 
     let pods: PodList = Arc::new(RwLock::new(HashSet::new()));
     // Start pod worker
-    let mut pod_worker = PodWorker::new(pods.clone(), pod_store.clone(), resync_rx);
+    let mut pod_worker = PodWorker::new(pods.clone(), pod_store.clone(), tx, resync_rx);
     let pod_worker_handle = tokio::spawn(async move { pod_worker.run(rx).await });
 
     let mut status_manager = StatusManager::new(pods, pod_store);

@@ -303,7 +303,7 @@ pub struct PodCondition {
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum ContainerState {
     Running,
-    Terminated,
+    Terminated { exit_code: i64 },
     Waiting,
 }
 
@@ -314,7 +314,9 @@ impl From<Option<bollard::models::ContainerState>> for ContainerState {
                 Some(status) => match status {
                     ContainerStateStatusEnum::RUNNING => ContainerState::Running,
                     ContainerStateStatusEnum::EXITED | ContainerStateStatusEnum::DEAD => {
-                        ContainerState::Terminated
+                        ContainerState::Terminated {
+                            exit_code: state.exit_code.unwrap_or(0),
+                        }
                     },
                     _ => ContainerState::Waiting,
                 },
