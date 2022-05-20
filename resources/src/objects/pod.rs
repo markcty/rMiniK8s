@@ -79,6 +79,12 @@ pub struct Container {
     pub name: String,
     /// Docker image name.
     pub image: String,
+    /// Image pull policy.
+    /// Defaults to Always if :latest tag is specified,
+    /// or IfNotPresent otherwise.
+    /// Cannot be updated.
+    #[serde(default)]
+    pub image_pull_policy: Option<ImagePullPolicy>,
     /// Entrypoint array. Not executed within a shell.
     /// The docker image's ENTRYPOINT is used if this is not provided.
     #[serde(default)]
@@ -101,6 +107,67 @@ impl Container {
             metrics::Resource::Memory => self.resources.requests.memory,
         }
     }
+
+    /// Determine image pull policy.
+    ///
+    /// Return the image pull policy it's specified.
+    /// If the image pull policy is not specified,
+    /// fefaults to Always if :latest tag is specified,
+    /// or IfNotPresent otherwise.
+    ///
+    /// # Examples
+    /// ```
+    /// use resources::objects::pod::{Container, ImagePullPolicy};
+    ///
+    /// let container = Container {
+    ///     name: "nginx".to_string(),
+    ///     image: "nginx:latest".to_string(),
+    ///     image_pull_policy: Some(ImagePullPolicy::IfNotPresent),
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(container.image_pull_policy(), ImagePullPolicy::IfNotPresent);
+    ///
+    /// let container = Container {
+    ///     name: "httpd".to_string(),
+    ///     image: "httpd:2.4.53".to_string(),
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(container.image_pull_policy(), ImagePullPolicy::IfNotPresent);
+    ///
+    /// let container = Container {
+    ///     name: "ubuntu".to_string(),
+    ///     image: "ubuntu:latest".to_string(),
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(container.image_pull_policy(), ImagePullPolicy::Always);
+    ///
+    /// let container = Container {
+    ///     name: "debian".to_string(),
+    ///     image: "debian:latest".to_string(),
+    ///     image_pull_policy: Some(ImagePullPolicy::Never),
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(container.image_pull_policy(), ImagePullPolicy::Never);
+    /// ```
+    pub fn image_pull_policy(&self) -> ImagePullPolicy {
+        match &self.image_pull_policy {
+            Some(policy) => policy.to_owned(),
+            None => {
+                if self.image.ends_with(":latest") {
+                    ImagePullPolicy::Always
+                } else {
+                    ImagePullPolicy::IfNotPresent
+                }
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub enum ImagePullPolicy {
+    Always,
+    Never,
+    IfNotPresent,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

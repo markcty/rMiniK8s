@@ -1,3 +1,4 @@
+apiVersion: v1
 kind: Pod
 metadata:
   name: httpd
@@ -6,6 +7,6 @@ metadata:
 spec:
   containers:
     - name: httpd
-      image: httpd:latest
+      image: httpd:2.4.53
       ports:
         - containerPort: 80

@@ -17,6 +17,7 @@ spec:
       containers:
         - name: php-apache
           image: hpa-example:latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 80
           resources:

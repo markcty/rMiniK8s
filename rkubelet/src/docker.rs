@@ -1,14 +1,14 @@
-use std::{cmp::Eq, default::Default, hash::Hash};
+use std::{cmp::Eq, collections::HashMap, default::Default, hash::Hash};
 
 use anyhow::{Context, Result};
 use bollard::{
     container::{Config, CreateContainerOptions, StartContainerOptions},
     errors::Error::DockerResponseServerError,
-    image::CreateImageOptions,
+    image::{CreateImageOptions, ListImagesOptions},
     models::ContainerInspectResponse,
 };
 use futures::{future::try_join_all, StreamExt};
-use resources::objects::pod::ContainerStatus;
+use resources::objects::pod::{ContainerStatus, ImagePullPolicy};
 use serde::Serialize;
 
 use crate::config::DOCKER;
@@ -19,29 +19,70 @@ pub struct Image {
 }
 
 impl Image {
+    pub fn new(name: &str) -> Self {
+        let name = if name.contains(':') {
+            name.to_string()
+        } else {
+            // Default tag to "latest", otherwise we'll pull all the tags
+            format!("{}:latest", name)
+        };
+        Self {
+            name,
+        }
+    }
+
     pub fn name(&self) -> &String {
         &self.name
     }
 
-    pub async fn create(name: &str) -> Self {
+    pub async fn pull(&self) -> Result<()> {
         let options = Some(CreateImageOptions {
-            from_image: name,
+            from_image: self.name.clone(),
             ..Default::default()
         });
         let mut stream = DOCKER.create_image(options, None, None);
 
-        tracing::info!("Pulling image {}...", name);
+        tracing::info!("Pulling image {}...", self.name);
         while let Some(result) = stream.next().await {
-            let result = result.unwrap();
+            let result = result?;
             if let Some(error) = result.error {
-                tracing::error!("{}", error);
+                tracing::error!("{:#}", error);
             }
             if let Some(progress) = result.progress {
                 tracing::info!("{}", progress);
             }
         }
-        Image {
-            name: name.to_owned(),
+        Ok(())
+    }
+
+    pub async fn exists(&self) -> bool {
+        let mut filters = HashMap::new();
+        filters.insert("reference".to_string(), vec![self.name.clone()]);
+        let options = Some(ListImagesOptions {
+            filters,
+            ..Default::default()
+        });
+        let response = DOCKER.list_images(options).await;
+        match response {
+            Ok(images) => !images.is_empty(),
+            Err(error) => {
+                tracing::error!("Error listing image: {:#}", error);
+                false
+            },
+        }
+    }
+
+    pub async fn pull_with_policy(&self, policy: ImagePullPolicy) -> Result<()> {
+        match policy {
+            ImagePullPolicy::IfNotPresent => {
+                if self.exists().await {
+                    Ok(())
+                } else {
+                    self.pull().await
+                }
+            },
+            ImagePullPolicy::Always => self.pull().await,
+            ImagePullPolicy::Never => Ok(()),
         }
     }
 }

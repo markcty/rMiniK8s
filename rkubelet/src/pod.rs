@@ -11,8 +11,8 @@ use futures::future::try_join_all;
 use resources::objects::{
     pod,
     pod::{
-        ContainerState, ContainerStatus, PodCondition, PodConditionType, PodPhase, PodSpec,
-        PodStatus, RestartPolicy, VolumeMount,
+        ContainerState, ContainerStatus, ImagePullPolicy, PodCondition, PodConditionType, PodPhase,
+        PodSpec, PodStatus, RestartPolicy, VolumeMount,
     },
     KubeObject, KubeResource, Metadata,
 };
@@ -115,7 +115,10 @@ impl Pod {
         container: &pod::Container,
         sandbox: &Container,
     ) -> Result<Container> {
-        let image = Image::create(&container.image).await;
+        let image = Image::new(&container.image);
+        image
+            .pull_with_policy(container.image_pull_policy())
+            .await?;
         let mode = Some(format!("container:{}", sandbox.id()));
 
         let volumes = self.create_volumes()?;
@@ -161,7 +164,10 @@ impl Pod {
     }
 
     async fn create_sandbox(&self) -> Result<Container> {
-        let image = Image::create(PAUSE_IMAGE_NAME).await;
+        let image = Image::new(PAUSE_IMAGE_NAME);
+        image
+            .pull_with_policy(ImagePullPolicy::IfNotPresent)
+            .await?;
         let host_config = Some(HostConfig {
             network_mode: Some(self.spec.network_mode()),
             ipc_mode: Some("shareable".to_string()),

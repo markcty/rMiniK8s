@@ -144,13 +144,8 @@ impl PodWorker {
         match pod {
             Ok(pod) => {
                 let res = pod.remove().await;
-                match res {
-                    Ok(_) => {
-                        tracing::info!("Pod {} removed", name);
-                    },
-                    Err(err) => {
-                        tracing::error!("Failed to remove pod {}: {:#}", name, err);
-                    },
+                if let Err(err) = res {
+                    tracing::error!("Failed to remove pod {}: {:#}", name, err);
                 }
             },
             Err(err) => tracing::error!("Failed to load pod {}: {:#}", name, err),
