@@ -1,6 +1,6 @@
 use std::{
     cmp::{max, min, Ordering},
-    collections::{HashMap, LinkedList},
+    collections::{HashMap, HashSet, LinkedList},
 };
 
 use anyhow::{Context, Error, Result};
@@ -9,7 +9,7 @@ use futures_delay_queue::{delay_queue, DelayQueue};
 use futures_intrusive::{buffer::GrowingHeapBuf, channel::shared::GenericReceiver};
 use parking_lot::RawMutex;
 use resources::{
-    informer::{EventHandler, Informer, Store},
+    informer::{EventHandler, Informer, ResyncHandler, Store},
     objects::{
         hpa::{
             HPAScalingRules, HorizontalPodAutoscaler, HorizontalPodAutoscalerBehavior,
@@ -46,8 +46,12 @@ struct ScaleEvent {
     pub time: NaiveDateTime,
 }
 
+#[derive(Debug)]
+struct ResyncNotification;
+
 pub struct PodAutoscaler {
     rx: Receiver<String>,
+    resync_rx: Receiver<ResyncNotification>,
     hpa_informer: Option<JoinHandle<Result<(), Error>>>,
     hpa_store: Store<KubeObject>,
     pod_informer: Option<JoinHandle<Result<(), Error>>>,
@@ -60,12 +64,14 @@ pub struct PodAutoscaler {
 
     work_queue: DelayQueue<String, GrowingHeapBuf<String>>,
     work_queue_rx: GenericReceiver<RawMutex, String, GrowingHeapBuf<String>>,
+    in_queue: HashSet<String>,
 }
 
 impl PodAutoscaler {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel::<String>(16);
-        let hpa_informer = PodAutoscaler::create_hpa_informer(tx);
+        let (resync_tx, resync_rx) = mpsc::channel::<ResyncNotification>(16);
+        let hpa_informer = PodAutoscaler::create_hpa_informer(tx, resync_tx);
         let hpa_store = hpa_informer.get_store();
         let pod_informer = PodAutoscaler::create_pod_informer();
         let pod_store = pod_informer.get_store();
@@ -77,6 +83,7 @@ impl PodAutoscaler {
 
         Self {
             rx,
+            resync_rx,
             hpa_informer: Some(hpa_informer),
             hpa_store,
             pod_informer: Some(pod_informer),
@@ -88,6 +95,7 @@ impl PodAutoscaler {
 
             work_queue,
             work_queue_rx,
+            in_queue: HashSet::new(),
         }
     }
 
@@ -97,9 +105,15 @@ impl PodAutoscaler {
         loop {
             select! {
                 Some(hpa_name) = self.rx.recv() => {
+                    // Enqueue immediately if HPA is newly added of updated
+                    self.in_queue.insert(hpa_name.to_owned());
                     self.work_queue.insert_at(hpa_name, std::time::Instant::now());
                 },
+                Some(_) = self.resync_rx.recv() => {
+                    self.handle_resync().await;
+                },
                 Some(hpa_name) = self.work_queue_rx.receive() => {
+                    self.in_queue.remove(&hpa_name);
                     let store = self.hpa_store.read().await;
                     let object = store.get(&format!("/api/v1/horizontalpodautoscalers/{}", hpa_name));
                     match object {
@@ -110,10 +124,10 @@ impl PodAutoscaler {
                             match result {
                                 Ok(_) => tracing::info!("Reconciled HPA {}", hpa_name),
                                 Err(e) =>
-                                    tracing::error!("Error reconciling {}: {}", hpa_name, e)
+                                    tracing::error!("Error reconciling {}: {:#}", hpa_name, e)
                                 ,
                             }
-                            self.work_queue.insert(hpa_name, std::time::Duration::from_secs(SYNC_PERIOD as u64));
+                            self.enqueue_hpa(&hpa_name, std::time::Duration::from_secs(SYNC_PERIOD as u64));
                         },
                         None => {
                             tracing::info!("Horizontal Pod Autoscaler {} deleted", hpa_name);
@@ -535,7 +549,10 @@ impl PodAutoscaler {
         }
     }
 
-    fn create_hpa_informer(tx: Sender<String>) -> Informer<KubeObject> {
+    fn create_hpa_informer(
+        tx: Sender<String>,
+        resync_tx: Sender<ResyncNotification>,
+    ) -> Informer<KubeObject> {
         let lw = create_lister_watcher("horizontalpodautoscalers".to_string());
 
         let tx_add = tx;
@@ -565,8 +582,15 @@ impl PodAutoscaler {
             }),
             delete_cls: Box::new(move |_| Box::pin(async move { Ok(()) })),
         };
+        let rh = ResyncHandler(Box::new(move |()| {
+            let resync_tx = resync_tx.clone();
+            Box::pin(async move {
+                resync_tx.send(ResyncNotification).await?;
+                Ok(())
+            })
+        }));
 
-        Informer::new(lw, eh)
+        Informer::new(lw, eh, rh)
     }
 
     fn create_pod_informer() -> Informer<KubeObject> {
@@ -576,6 +600,25 @@ impl PodAutoscaler {
             update_cls: Box::new(move |(_, __)| Box::pin(async move { Ok(()) })),
             delete_cls: Box::new(move |_| Box::pin(async move { Ok(()) })),
         };
-        Informer::new(lw, eh)
+        let rh = ResyncHandler(Box::new(move |()| Box::pin(async move { Ok(()) })));
+        Informer::new(lw, eh, rh)
+    }
+
+    async fn handle_resync(&mut self) {
+        let store = self.hpa_store.read().await;
+        for hpa in store.values() {
+            let hpa_name = &hpa.metadata.name;
+            if !self.in_queue.contains(hpa_name) {
+                self.in_queue.insert(hpa_name.to_owned());
+                self.work_queue
+                    .insert_at(hpa_name.to_owned(), std::time::Instant::now());
+            }
+        }
+    }
+
+    fn enqueue_hpa(&self, hpa_name: &String, duration: std::time::Duration) {
+        if !self.in_queue.contains(hpa_name) {
+            self.work_queue.insert(hpa_name.to_owned(), duration);
+        }
     }
 }
