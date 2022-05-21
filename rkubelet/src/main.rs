@@ -5,7 +5,7 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
     models::Response,
-    objects::KubeObject,
+    objects::pod::Pod,
 };
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::connect_async;
@@ -37,10 +37,10 @@ async fn main() -> Result<()> {
             Box::pin(async {
                 let res = reqwest::get(format!("{}/api/v1/pods", CONFIG.cluster.api_server_url))
                     .await?
-                    .json::<Response<Vec<KubeObject>>>()
+                    .json::<Response<Vec<Pod>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok::<Vec<Pod>, Error>(res)
             })
         }),
         watcher: Box::new(|_| {
@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
     let tx_add = tx.clone();
     let tx_update = tx_add.clone();
     let tx_delete = tx_add.clone();
-    let eh = EventHandler::<KubeObject> {
+    let eh = EventHandler::<Pod> {
         add_cls: Box::new(move |pod| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();

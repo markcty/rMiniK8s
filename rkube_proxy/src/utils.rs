@@ -2,7 +2,7 @@ use anyhow::{anyhow, Ok};
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store},
     models::Response,
-    objects::KubeObject,
+    objects::service::Service,
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
@@ -12,13 +12,13 @@ use crate::{Notification, ResyncNotification, CONFIG};
 pub fn create_services_informer(
     tx: Sender<Notification>,
     tx_resync: Sender<ResyncNotification>,
-) -> (Informer<KubeObject>, Store<KubeObject>) {
+) -> (Informer<Service>, Store<Service>) {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/services")?)
                     .await?
-                    .json::<Response<Vec<KubeObject>>>()
+                    .json::<Response<Vec<Service>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
                 Ok(res)

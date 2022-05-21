@@ -1,16 +1,16 @@
 use anyhow::Result;
-use resources::{informer::Store, models::Response, objects::KubeObject};
+use resources::{informer::Store, models::Response, objects::pod};
 use tokio::time::sleep;
 
 use crate::{config::CONFIG, pod::Pod, PodList};
 
 pub struct StatusManager {
     pods: PodList,
-    pod_store: Store<KubeObject>,
+    pod_store: Store<pod::Pod>,
 }
 
 impl StatusManager {
-    pub fn new(pods: PodList, pod_store: Store<KubeObject>) -> Self {
+    pub fn new(pods: PodList, pod_store: Store<pod::Pod>) -> Self {
         Self {
             pods,
             pod_store,

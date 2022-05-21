@@ -1,17 +1,28 @@
 use serde::{Deserialize, Serialize};
 
-use super::{pod::PodTemplateSpec, Labels};
+use super::{pod::PodTemplateSpec, Labels, Metadata, Object};
 
 /// ReplicaSet ensures that a specified number of pod replicas are running
 /// at any given time.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ReplicaSet {
+    pub metadata: Metadata,
     /// Defines the specification of the desired behavior of the ReplicaSet.
     pub spec: ReplicaSetSpec,
     /// The most recently observed status of the ReplicaSet.
     /// This data may be out of date by some window of time.
     /// Populated by the system. Read-only.
     pub status: Option<ReplicaSetStatus>,
+}
+
+impl Object for ReplicaSet {
+    fn kind(&self) -> &'static str {
+        "replicaset"
+    }
+
+    fn name(&self) -> &String {
+        &self.metadata.name
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

@@ -1,8 +1,25 @@
 use serde::{Deserialize, Serialize};
 
+use super::{Metadata, Object};
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Ingress {
+    pub metadata: Metadata,
     pub spec: IngressSpec,
+}
+
+impl Object for Ingress {
+    fn kind(&self) -> &'static str {
+        "ingress"
+    }
+
+    fn kind_plural(&self) -> String {
+        "ingresses".to_string()
+    }
+
+    fn name(&self) -> &String {
+        &self.metadata.name
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

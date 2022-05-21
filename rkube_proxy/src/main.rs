@@ -6,7 +6,11 @@ use std::env;
 use anyhow::Result;
 use k8s_iptables::K8sIpTables;
 use reqwest::Url;
-use resources::{informer::Store, models::NodeConfig, objects::KubeObject};
+use resources::{
+    informer::Store,
+    models::NodeConfig,
+    objects::{service::Service, Object},
+};
 use tokio::{select, sync::mpsc};
 
 use crate::utils::create_services_informer;
@@ -16,9 +20,9 @@ mod utils;
 
 #[derive(Debug)]
 pub enum Notification {
-    Add(KubeObject),
-    Update(KubeObject, KubeObject),
-    Delete(KubeObject),
+    Add(Service),
+    Update(Service, Service),
+    Delete(Service),
 }
 
 #[derive(Debug)]
@@ -72,7 +76,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn handle_resync(ipt: &mut K8sIpTables, svc_store: Store<KubeObject>) -> Result<()> {
+async fn handle_resync(ipt: &mut K8sIpTables, svc_store: Store<Service>) -> Result<()> {
     ipt.cleanup().expect("Failed to cleanup ip table");
     let store = svc_store.read().await;
     for (_, svc) in store.iter() {
@@ -90,11 +94,11 @@ async fn handle_notification(ipt: &mut K8sIpTables, n: Notification) -> Result<(
         },
         Notification::Update(old, new) => {
             // TODO: all right, I am lazy
-            ipt.del_svc(&old.name());
+            ipt.del_svc(old.name());
             ipt.add_svc(&new);
         },
         Notification::Delete(old) => {
-            ipt.del_svc(&old.name());
+            ipt.del_svc(old.name());
         },
     }
 

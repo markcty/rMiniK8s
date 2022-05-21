@@ -15,7 +15,7 @@ use resources::{
             ContainerState, ContainerStatus, ImagePullPolicy, PodCondition, PodConditionType,
             PodPhase, PodSpec, PodStatus, RestartPolicy, VolumeMount,
         },
-        KubeObject, KubeResource, Metadata,
+        KubeObject, Metadata,
     },
     utils::first_error_or_ok,
 };
@@ -43,44 +43,33 @@ pub struct Pod {
 }
 
 impl Pod {
-    pub fn load(object: KubeObject) -> Result<Self> {
-        if let KubeResource::Pod(resource) = object.resource {
-            let status = resource
-                .status
-                .with_context(|| "[Pod::load] Status is missing")?;
-            Ok(Pod {
-                metadata: object.metadata,
-                spec: resource.spec,
-                status,
-            })
-        } else {
-            Err(anyhow::anyhow!(
-                "Expecting Pod, received {:?}",
-                object.resource
-            ))
-        }
+    pub fn load(pod: pod::Pod) -> Result<Self> {
+        let status = pod
+            .status
+            .with_context(|| "[Pod::load] Status is missing")?;
+        Ok(Pod {
+            metadata: pod.metadata,
+            spec: pod.spec,
+            status,
+        })
     }
 
-    pub async fn create(object: KubeObject) -> Result<Self> {
-        if let KubeResource::Pod(resource) = object.resource {
-            let name = object.metadata.name.to_owned();
-            tracing::info!("Creating pod {}...", name);
-            let mut pod = Self {
-                metadata: object.metadata,
-                spec: resource.spec,
-                status: PodStatus::default(),
-            };
-            create_dir_all(pod.dir())
-                .with_context(|| format!("Failed to create pod directory for {}", name))?;
+    pub async fn create(pod: pod::Pod) -> Result<Self> {
+        let name = pod.metadata.name.to_owned();
+        tracing::info!("Creating pod {}...", name);
+        let mut pod = Self {
+            metadata: pod.metadata,
+            spec: pod.spec,
+            status: PodStatus::default(),
+        };
+        create_dir_all(pod.dir())
+            .with_context(|| format!("Failed to create pod directory for {}", name))?;
 
-            let sandbox = pod.create_sandbox().await?;
-            pod.create_containers(&sandbox).await?;
-            pod.update_status().await?;
+        let sandbox = pod.create_sandbox().await?;
+        pod.create_containers(&sandbox).await?;
+        pod.update_status().await?;
 
-            Ok(pod)
-        } else {
-            panic!("Expecting Pod, received {:?}", object.resource);
-        }
+        Ok(pod)
     }
 
     pub async fn start(&self) -> Result<()> {
@@ -365,13 +354,11 @@ impl Pod {
     }
 
     pub fn object(&self) -> KubeObject {
-        KubeObject {
+        KubeObject::Pod(pod::Pod {
             metadata: self.metadata.clone(),
-            resource: KubeResource::Pod(pod::Pod {
-                spec: self.spec.clone(),
-                status: Some(self.status.clone()),
-            }),
-        }
+            spec: self.spec.clone(),
+            status: Some(self.status.clone()),
+        })
     }
 
     fn compute_phase(&self, containers: &Vec<ContainerStatus>) -> PodPhase {

@@ -1,14 +1,9 @@
-use std::{
-    collections::{HashMap, HashSet},
-    error::Error,
-    net::Ipv4Addr,
-    rc::Rc,
-};
+use std::{collections::HashMap, error::Error, net::Ipv4Addr, rc::Rc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use iptables::IPTables;
 use rand::distributions::{Alphanumeric, DistString};
-use resources::objects::{service::ServicePort, KubeObject, KubeResource::Service};
+use resources::objects::{service::Service, Object};
 
 pub struct K8sIpTables {
     ipt: Rc<IPTables>,
@@ -301,19 +296,23 @@ impl K8sIpTables {
         svc_table.change_cluster_ip(new_cluster_ip);
     }
 
-    pub fn add_svc(&mut self, svc: &KubeObject) {
+    pub fn add_svc(&mut self, svc: &Service) {
         let name = svc.name();
-        let cluster_ip = get_svc_cluster_ip(svc).expect("Service should always has a cluster ip");
-        self.new_svc(&name, &cluster_ip);
+        let cluster_ip = svc
+            .spec
+            .cluster_ip
+            .context("Service has no cluster ip, should not happen")
+            .expect("Service should always has a cluster ip");
+        self.new_svc(name, &cluster_ip);
 
-        let svc_ports = get_svc_ports(svc);
+        let svc_ports = svc.spec.ports.clone();
         for port in svc_ports {
-            self.add_svc_port(&name, port.port, port.target_port);
+            self.add_svc_port(name, port.port, port.target_port);
         }
 
-        let eps = get_svc_eps(svc);
+        let eps = svc.spec.endpoints.clone();
         for ep in eps {
-            self.add_svc_ep(&name, &ep);
+            self.add_svc_ep(name, &ep);
         }
     }
 
@@ -328,34 +327,6 @@ impl K8sIpTables {
         svc_tb.cleanup();
 
         tracing::info!("Delete service {}", name);
-    }
-}
-
-fn get_svc_eps(svc: &KubeObject) -> HashSet<Ipv4Addr> {
-    if let Service(ref svc) = svc.resource {
-        svc.spec.endpoints.clone()
-    } else {
-        HashSet::new()
-    }
-}
-
-fn get_svc_ports(svc: &KubeObject) -> Vec<ServicePort> {
-    if let Service(ref svc) = svc.resource {
-        svc.spec.ports.clone()
-    } else {
-        vec![]
-    }
-}
-
-fn get_svc_cluster_ip(svc: &KubeObject) -> Result<Ipv4Addr> {
-    if let Service(ref svc) = svc.resource {
-        let ip = svc
-            .spec
-            .cluster_ip
-            .context("Service has no cluster ip, should not happen")?;
-        Ok(ip)
-    } else {
-        Err(anyhow!("Not servcie"))
     }
 }
 

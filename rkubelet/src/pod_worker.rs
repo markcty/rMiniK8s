@@ -1,5 +1,5 @@
 use anyhow::Result;
-use resources::{informer::Store, objects::KubeObject};
+use resources::{informer::Store, objects::pod};
 use tokio::{
     select,
     sync::mpsc::{Receiver, Sender},
@@ -9,7 +9,7 @@ use crate::{models::PodUpdate, pod::Pod, PodList, ResyncNotification};
 
 pub struct PodWorker {
     pods: PodList,
-    pod_store: Store<KubeObject>,
+    pod_store: Store<pod::Pod>,
     work_queue_tx: Sender<PodUpdate>,
     resync_rx: Receiver<ResyncNotification>,
 }
@@ -17,7 +17,7 @@ pub struct PodWorker {
 impl PodWorker {
     pub fn new(
         pods: PodList,
-        pod_store: Store<KubeObject>,
+        pod_store: Store<pod::Pod>,
         work_queue_tx: Sender<PodUpdate>,
         resync_rx: Receiver<ResyncNotification>,
     ) -> Self {
@@ -73,7 +73,7 @@ impl PodWorker {
         tracing::info!("Finished resync");
     }
 
-    async fn handle_pod_add(&mut self, pod: KubeObject) {
+    async fn handle_pod_add(&mut self, pod: pod::Pod) {
         let name = pod.metadata.name.to_owned();
         tracing::info!("Pod added: {}", name);
         let res = Pod::create(pod).await;
@@ -97,7 +97,7 @@ impl PodWorker {
         store.insert(name);
     }
 
-    async fn handle_pod_update(&mut self, pod: KubeObject) {
+    async fn handle_pod_update(&mut self, pod: pod::Pod) {
         let pods = self.pods.read().await;
         let name = pod.metadata.name.to_owned();
         // Pod is not in list, maybe it's being reconciled
@@ -135,7 +135,7 @@ impl PodWorker {
         }
     }
 
-    async fn handle_pod_delete(&mut self, pod: KubeObject) {
+    async fn handle_pod_delete(&mut self, pod: pod::Pod) {
         let name = pod.metadata.name.to_owned();
         tracing::info!("Pod deleted: {}", name);
         let mut store = self.pods.write().await;

@@ -2,6 +2,7 @@ use std::{fs::File, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Args;
+use resources::objects::Object;
 use serde::Deserialize;
 
 use crate::{objects::KubeObject, utils::gen_url};
@@ -29,7 +30,7 @@ impl Arg {
 
 fn create(object: &KubeObject) -> Result<String> {
     let client = reqwest::blocking::Client::new();
-    let url = gen_url(object.kind() + "s", None)?;
+    let url = gen_url(object.kind_plural(), None)?;
     let res = client.post(url).json(&object).send()?.json::<CreateRes>()?;
     match res.cause {
         Some(cause) => Err(anyhow::anyhow!("{}: {}", res.msg, cause)),

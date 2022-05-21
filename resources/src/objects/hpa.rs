@@ -1,12 +1,23 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use super::{metrics::Resource, object_reference::ObjectReference};
+use super::{metrics::Resource, object_reference::ObjectReference, Metadata, Object};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct HorizontalPodAutoscaler {
+    pub metadata: Metadata,
     pub spec: HorizontalPodAutoscalerSpec,
     pub status: Option<HorizontalPodAutoscalerStatus>,
+}
+
+impl Object for HorizontalPodAutoscaler {
+    fn kind(&self) -> &'static str {
+        "horizontalpodautoscaler"
+    }
+
+    fn name(&self) -> &String {
+        &self.metadata.name
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

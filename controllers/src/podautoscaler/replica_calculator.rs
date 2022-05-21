@@ -6,8 +6,8 @@ use resources::{
     informer::Store,
     objects::{
         metrics::{PodMetric, PodMetricsInfo, Resource},
-        pod::{PodConditionType, PodPhase},
-        KubeObject, KubeResource, Labels,
+        pod::{Pod, PodConditionType, PodPhase},
+        Labels,
     },
 };
 
@@ -15,11 +15,11 @@ use crate::metrics::MetricsClient;
 
 pub struct ReplicaCalculator {
     client: MetricsClient,
-    pod_store: Store<KubeObject>,
+    pod_store: Store<Pod>,
 }
 
 impl ReplicaCalculator {
-    pub fn new(pod_store: Store<KubeObject>) -> Self {
+    pub fn new(pod_store: Store<Pod>) -> Self {
         Self {
             client: MetricsClient::new(),
             pod_store,
@@ -47,13 +47,9 @@ impl ReplicaCalculator {
         let scale_ratio =
             self.calc_scale_ratio_by_utilization(&metrics, &pods, target_utilization, resource);
         // Make conservative assumption for missing pods
-        for object in missing_pods {
-            let pod = match object.resource {
-                KubeResource::Pod(pod) => pod,
-                _ => continue,
-            };
+        for pod in missing_pods {
             metrics.insert(
-                object.metadata.name,
+                pod.metadata.name.to_owned(),
                 PodMetric {
                     timestamp: Local::now().naive_utc(),
                     window: 60,
@@ -132,30 +128,19 @@ impl ReplicaCalculator {
     }
 
     /// Filter out failed and invalid pods
-    fn filter_pods(
-        &self,
-        metrics: &mut PodMetricsInfo,
-        pods: &[KubeObject],
-    ) -> Result<Vec<KubeObject>> {
+    fn filter_pods(&self, metrics: &mut PodMetricsInfo, pods: &[Pod]) -> Result<Vec<Pod>> {
         // Pods that haven't been present in the metrics yet
-        let mut missing_pods = Vec::<KubeObject>::new();
+        let mut missing_pods = Vec::<Pod>::new();
 
-        for object in pods {
-            let pod = match &object.resource {
-                KubeResource::Pod(pod) => pod,
-                _ => {
-                    tracing::warn!("Expecting pod, got {}", object.kind());
-                    continue;
-                },
-            };
+        for pod in pods {
             let status = pod
                 .status
                 .as_ref()
-                .with_context(|| format!("Missing status for pod {}", object.metadata.name))?;
-            let metric = metrics.get(&object.metadata.name);
+                .with_context(|| format!("Missing status for pod {}", pod.metadata.name))?;
+            let metric = metrics.get(&pod.metadata.name);
             if metric.is_none() {
-                tracing::debug!("No metrics found for pod {}", object.metadata.name);
-                missing_pods.push(object.to_owned());
+                tracing::debug!("No metrics found for pod {}", pod.metadata.name);
+                missing_pods.push(pod.to_owned());
                 continue;
             }
             if status.phase == PodPhase::Failed
@@ -165,8 +150,8 @@ impl ReplicaCalculator {
                     .map(|c| c.status)
                     .unwrap_or(false)
             {
-                tracing::info!("Ignored Pod {} since it's not ready", object.metadata.name);
-                metrics.remove(&object.metadata.name);
+                tracing::info!("Ignored Pod {} since it's not ready", pod.metadata.name);
+                metrics.remove(&pod.metadata.name);
                 continue;
             }
         }
@@ -176,7 +161,7 @@ impl ReplicaCalculator {
     fn calc_scale_ratio_by_utilization(
         &self,
         metrics: &HashMap<String, PodMetric>,
-        pods: &[KubeObject],
+        pods: &[Pod],
         target_utilization: u32,
         resource: &Resource,
     ) -> f64 {
@@ -184,10 +169,7 @@ impl ReplicaCalculator {
         let requests_total = pods
             .iter()
             .filter(|p| metrics.contains_key(&p.metadata.name))
-            .map(|p| match &p.resource {
-                KubeResource::Pod(p) => p.requests(resource),
-                _ => 0,
-            })
+            .map(|p| p.requests(resource))
             .sum::<i64>();
         if requests_total == 0 {
             return 1.0;
@@ -221,7 +203,7 @@ impl ReplicaCalculator {
         current_value as f64 / target_value as f64
     }
 
-    async fn get_pods(&self, selector: &Labels) -> Vec<KubeObject> {
+    async fn get_pods(&self, selector: &Labels) -> Vec<Pod> {
         self.pod_store
             .read()
             .await

@@ -3,10 +3,7 @@ use clap::Args;
 use reqwest::blocking::Client;
 use resources::{
     models::Response,
-    objects::{
-        KubeObject,
-        KubeResource::{self, HorizontalPodAutoscaler, Pod, ReplicaSet, Service},
-    },
+    objects::KubeObject::{self, HorizontalPodAutoscaler, Ingress, Pod, ReplicaSet, Service},
 };
 
 use crate::{
@@ -39,7 +36,7 @@ impl Arg {
                     "NAME", "STATUS", "RESTARTS", "AGE"
                 );
                 for object in res.data.unwrap() {
-                    if let Pod(pod) = object.resource {
+                    if let Pod(pod) = object {
                         let status = pod.status.as_ref().unwrap();
                         let restarts = status
                             .container_statuses
@@ -48,7 +45,7 @@ impl Arg {
                             .sum::<u32>();
                         println!(
                             "{:<20} {:<10} {:<8} {:<10}",
-                            object.metadata.name,
+                            pod.metadata.name,
                             status.phase,
                             restarts,
                             calc_age(status.start_time)
@@ -62,11 +59,11 @@ impl Arg {
                     "NAME", "DESIRED", "CURRENT", "READY"
                 );
                 for object in res.data.unwrap() {
-                    if let ReplicaSet(rs) = object.resource {
+                    if let ReplicaSet(rs) = object {
                         let status = rs.status.unwrap_or_default();
                         println!(
                             "{:<20} {:<8} {:<8} {:<8}",
-                            object.metadata.name,
+                            rs.metadata.name,
                             rs.spec.replicas,
                             status.replicas,
                             status.ready_replicas,
@@ -80,7 +77,7 @@ impl Arg {
                     "NAME", "CLUSTER-IP", "PORTS", "ENDPOINTS"
                 );
                 for object in res.data.unwrap() {
-                    if let Service(svc) = object.resource {
+                    if let Service(svc) = object {
                         let ports = svc
                             .spec
                             .ports
@@ -103,7 +100,7 @@ impl Arg {
                             .join(",");
                         println!(
                             "{: <20} {: <16} {: <20} {:<}",
-                            object.metadata.name,
+                            svc.metadata.name,
                             svc.spec.cluster_ip.ok_or_else(|| anyhow!(
                                 "Service should always have a cluster IP"
                             ))?,
@@ -116,8 +113,8 @@ impl Arg {
             ResourceKind::Ingresses => {
                 println!("{:<20} {:<30} PATH:SERVICE:PORT", "NAME", "HOST");
                 for object in res.data.unwrap() {
-                    let name = object.name();
-                    if let KubeResource::Ingress(ingress) = object.resource {
+                    if let Ingress(ingress) = object {
+                        let name = ingress.metadata.name;
                         for rule in ingress.spec.rules {
                             let paths = rule
                                 .paths
@@ -142,7 +139,7 @@ impl Arg {
                     "NAME", "REFERENCE", "CURRENT", "DESIRED", "LAST SCALE"
                 );
                 for object in res.data.unwrap() {
-                    if let HorizontalPodAutoscaler(hpa) = object.resource {
+                    if let HorizontalPodAutoscaler(hpa) = object {
                         let status = hpa
                             .status
                             .with_context(|| anyhow!("HorizontalPodAutoscaler has no status"))?;
@@ -154,7 +151,7 @@ impl Arg {
                         let reference = format!("{}/{}", scale_target.kind, scale_target.name);
                         println!(
                             "{:<16} {:<24} {:<8} {:<8} {:<}",
-                            object.metadata.name,
+                            hpa.metadata.name,
                             reference,
                             status.current_replicas,
                             status.desired_replicas,

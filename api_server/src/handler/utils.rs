@@ -4,8 +4,10 @@ use axum::{body::Bytes, BoxError};
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
 use futures::{Stream, TryStreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use resources::{models::ErrResponse, objects::KubeObject};
-use serde::Serialize;
+use resources::{
+    models::ErrResponse,
+    objects::{KubeObject, Object},
+};
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
 
@@ -14,13 +16,9 @@ use crate::{
     AppState, TMP_DIR,
 };
 
-pub async fn etcd_put(
-    app_state: &Arc<AppState>,
-    key: String,
-    val: impl Serialize,
-) -> Result<(), ErrResponse> {
+pub async fn etcd_put(app_state: &Arc<AppState>, val: &KubeObject) -> Result<(), ErrResponse> {
     let mut client = app_state.get_client().await?;
-    etcd::put(&mut client, &key, val, None)
+    etcd::put(&mut client, val.uri().as_str(), val, None)
         .await
         .map_err(ErrResponse::from)?;
     Ok(())

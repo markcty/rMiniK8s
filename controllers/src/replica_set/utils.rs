@@ -3,7 +3,7 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
     models::Response,
-    objects::{pod::Pod, replica_set::ReplicaSet, KubeObject, KubeResource},
+    objects::Object,
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
@@ -11,16 +11,16 @@ use tokio_tungstenite::connect_async;
 use crate::CONFIG;
 
 #[derive(Debug)]
-pub enum Event {
-    Add(KubeObject),
-    Update(KubeObject, KubeObject),
-    Delete(KubeObject),
+pub enum Event<T> {
+    Add(T),
+    Update(T, T),
+    Delete(T),
 }
 
 #[derive(Debug)]
 pub struct ResyncNotification;
 
-pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
+pub fn create_lister_watcher<T: Object>(path: String) -> ListerWatcher<T> {
     let list_url = format!("{}/api/v1/{}", CONFIG.api_server_url, path);
     let watch_url = format!("{}/api/v1/watch/{}", CONFIG.api_server_watch_url, path);
     ListerWatcher {
@@ -29,10 +29,10 @@ pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
             Box::pin(async {
                 let res = reqwest::get(list_url)
                     .await?
-                    .json::<Response<Vec<KubeObject>>>()
+                    .json::<Response<Vec<T>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok::<Vec<T>, Error>(res)
             })
         }),
         watcher: Box::new(move |_| {
@@ -46,36 +46,36 @@ pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
     }
 }
 
-pub fn create_informer(
+pub fn create_informer<T: Object>(
     path: String,
-    tx: Sender<Event>,
+    tx: Sender<Event<T>>,
     resync_tx: Sender<ResyncNotification>,
-) -> Informer<KubeObject> {
+) -> Informer<T> {
     let lw = create_lister_watcher(path);
 
     let tx_add = tx;
     let tx_update = tx_add.clone();
     let tx_delete = tx_add.clone();
-    let eh = EventHandler::<KubeObject> {
+    let eh = EventHandler::<T> {
         add_cls: Box::new(move |new| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();
             Box::pin(async move {
-                tx_add.send(Event::Add(new)).await?;
+                tx_add.send(Event::<T>::Add(new)).await?;
                 Ok(())
             })
         }),
         update_cls: Box::new(move |(old, new)| {
             let tx_update = tx_update.clone();
             Box::pin(async move {
-                tx_update.send(Event::Update(old, new)).await?;
+                tx_update.send(Event::<T>::Update(old, new)).await?;
                 Ok(())
             })
         }),
         delete_cls: Box::new(move |old| {
             let tx_delete = tx_delete.clone();
             Box::pin(async move {
-                tx_delete.send(Event::Delete(old)).await?;
+                tx_delete.send(Event::<T>::Delete(old)).await?;
                 Ok(())
             })
         }),
@@ -89,25 +89,4 @@ pub fn create_informer(
     }));
 
     Informer::new(lw, eh, rh)
-}
-
-pub fn unwrap_rs(object: &KubeObject) -> &ReplicaSet {
-    match &object.resource {
-        KubeResource::ReplicaSet(rs) => rs,
-        _ => panic!("Expecting ReplicaSet, got {}", object.kind()),
-    }
-}
-
-pub fn unwrap_rs_mut(object: &mut KubeObject) -> &mut ReplicaSet {
-    match &mut object.resource {
-        KubeResource::ReplicaSet(rs) => rs,
-        _ => panic!("Expecting ReplicaSet"),
-    }
-}
-
-pub fn unwrap_pod(object: &KubeObject) -> &Pod {
-    match &object.resource {
-        KubeResource::Pod(pod) => pod,
-        _ => panic!("Expecting Pod, got {}", object.kind()),
-    }
 }

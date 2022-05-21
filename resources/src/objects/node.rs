@@ -2,9 +2,22 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::{Metadata, Object};
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Node {
+    pub metadata: Metadata,
     pub status: NodeStatus,
+}
+
+impl Object for Node {
+    fn kind(&self) -> &'static str {
+        "node"
+    }
+
+    fn name(&self) -> &String {
+        &self.metadata.name
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

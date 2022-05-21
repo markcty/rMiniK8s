@@ -17,16 +17,9 @@ pub mod pod;
 pub mod replica_set;
 pub mod service;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct KubeObject {
-    pub metadata: Metadata,
-    #[serde(flatten)]
-    pub resource: KubeResource,
-}
-
 #[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq)]
 #[serde(tag = "kind")]
-pub enum KubeResource {
+pub enum KubeObject {
     Pod(pod::Pod),
     Binding(binding::Binding),
     Node(node::Node),
@@ -34,6 +27,32 @@ pub enum KubeResource {
     ReplicaSet(replica_set::ReplicaSet),
     Ingress(ingress::Ingress),
     HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
+}
+
+impl Object for KubeObject {
+    fn kind(&self) -> &'static str {
+        match self {
+            KubeObject::Pod(pod) => pod.kind(),
+            KubeObject::Binding(binding) => binding.kind(),
+            KubeObject::Node(node) => node.kind(),
+            KubeObject::Service(service) => service.kind(),
+            KubeObject::ReplicaSet(replica_set) => replica_set.kind(),
+            KubeObject::Ingress(ingress) => ingress.kind(),
+            KubeObject::HorizontalPodAutoscaler(hpa) => hpa.kind(),
+        }
+    }
+
+    fn name(&self) -> &String {
+        match self {
+            KubeObject::Pod(pod) => pod.name(),
+            KubeObject::Binding(binding) => binding.name(),
+            KubeObject::Node(node) => node.name(),
+            KubeObject::Service(service) => service.name(),
+            KubeObject::ReplicaSet(replica_set) => replica_set.name(),
+            KubeObject::Ingress(ingress) => ingress.name(),
+            KubeObject::HorizontalPodAutoscaler(hpa) => hpa.name(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -64,29 +83,30 @@ pub struct Metadata {
     pub owner_references: Vec<ObjectReference>,
 }
 
-impl KubeObject {
-    pub fn kind(&self) -> String {
-        self.resource.to_string().to_lowercase()
-    }
-    pub fn name(&self) -> String {
-        self.metadata.name.to_owned()
-    }
-}
-
 pub trait Object:
     Clone + Serialize + DeserializeOwned + Send + Sync + Debug + PartialEq + 'static
 {
-    fn uri(&self) -> String;
-}
+    /// Return the kind of the object
+    fn kind(&self) -> &'static str;
 
-impl Object for KubeObject {
+    /// Return the kind of the object in plural
+    fn kind_plural(&self) -> String {
+        self.kind().to_string() + "s"
+    }
+
+    /// Return the name of the object
+    fn name(&self) -> &String;
+
+    /// Return the prefix of the object in Etcd,
+    /// e.g. "pod" -> "/api/v1/pods"
+    fn prefix(&self) -> String {
+        format!("/api/v1/{}", self.kind_plural())
+    }
+
+    /// Return the URI of the project in Etcd
+    /// e.g. Pod "nginx" -> "/api/v1/pods/nginx"
     fn uri(&self) -> String {
-        let kind_prural = if self.kind() == "ingress" {
-            "ingresses".to_string()
-        } else {
-            self.kind() + "s"
-        };
-        format!("/api/v1/{}/{}", kind_prural, self.name().to_lowercase())
+        format!("{}/{}", self.prefix(), self.name())
     }
 }
 

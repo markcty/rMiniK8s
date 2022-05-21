@@ -8,7 +8,7 @@ use axum::{
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{KubeObject, KubeResource, Object},
+    objects::{KubeObject, Object},
 };
 use uuid::Uuid;
 
@@ -21,8 +21,8 @@ pub async fn create(
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::Service(ref mut service) = payload.resource {
-        payload.metadata.uid = Some(Uuid::new_v4());
+    if let KubeObject::Service(ref mut service) = payload {
+        service.metadata.uid = Some(Uuid::new_v4());
 
         if let Some(ip) = service.spec.cluster_ip {
             if app_state.service_ip_pool.contains(&ip) {
@@ -35,7 +35,7 @@ pub async fn create(
             service.spec.cluster_ip = Some(gen_service_ip(&app_state));
         }
 
-        etcd_put(&app_state, payload.uri(), &payload).await?;
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("service/{} created", payload.name())), None);
         Ok(Json(res))
     } else {
@@ -53,8 +53,8 @@ pub async fn update(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::Service(_) = payload.resource {
-        etcd_put(&app_state, payload.uri(), &payload).await?;
+    if let KubeObject::Service(_) = payload {
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("service/{} updated", payload.name())), None);
         Ok(Json(res))
     } else {

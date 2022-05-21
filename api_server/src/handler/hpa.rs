@@ -8,7 +8,7 @@ use axum::{
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{hpa::HorizontalPodAutoscalerStatus, KubeObject, KubeResource},
+    objects::{hpa::HorizontalPodAutoscalerStatus, KubeObject, Object},
 };
 use uuid::Uuid;
 
@@ -18,11 +18,11 @@ use crate::{etcd::forward_watch_to_ws, AppState};
 #[debug_handler]
 pub async fn create(
     Extension(app_state): Extension<Arc<AppState>>,
-    Json(mut payload): Json<KubeObject>,
+    Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::HorizontalPodAutoscaler(ref mut hpa) = payload.resource {
-        let hpa_name = &payload.metadata.name;
+    if let KubeObject::HorizontalPodAutoscaler(mut hpa) = payload {
+        let hpa_name = hpa.metadata.name.to_owned();
         let result = etcd_get_object(
             &app_state,
             format!("/api/v1/horizontalpodautoscalers/{}", hpa_name),
@@ -38,7 +38,7 @@ pub async fn create(
                 )),
             ));
         }
-        payload.metadata.uid = Some(Uuid::new_v4());
+        hpa.metadata.uid = Some(Uuid::new_v4());
         let target_kind = hpa.spec.scale_target_ref.kind.to_lowercase();
         let target = etcd_get_object(
             &app_state,
@@ -50,20 +50,15 @@ pub async fn create(
         )
         .await;
         match target {
-            Ok(target) => match target.resource {
-                KubeResource::ReplicaSet(rs) => {
+            Ok(target) => match target {
+                KubeObject::ReplicaSet(rs) => {
                     let rs_status = rs.status.unwrap();
                     hpa.status = Some(HorizontalPodAutoscalerStatus {
                         current_replicas: rs_status.replicas,
                         desired_replicas: rs_status.replicas,
                         last_scale_time: None,
                     });
-                    etcd_put(
-                        &app_state,
-                        format!("/api/v1/horizontalpodautoscalers/{}", hpa_name),
-                        &payload,
-                    )
-                    .await?;
+                    etcd_put(&app_state, &KubeObject::HorizontalPodAutoscaler(hpa)).await?;
                     let res = Response::new(
                         Some(format!("horizontalpodautoscaler/{} created", hpa_name)),
                         None,
@@ -145,12 +140,7 @@ pub async fn update(
     )
     .await?;
     if payload.kind() == "horizontalpodautoscaler" {
-        etcd_put(
-            &app_state,
-            format!("/api/v1/horizontalpodautoscalers/{}", hpa_name),
-            &payload,
-        )
-        .await?;
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(
             Some(format!("horizontalpodautoscaler/{} updated", hpa_name)),
             None,
@@ -179,18 +169,13 @@ pub async fn patch(
         Some("horizontalpodautoscaler"),
     )
     .await?;
-    match (&payload.resource, &mut object.resource) {
+    match (&payload, &mut object) {
         (
-            KubeResource::HorizontalPodAutoscaler(payload_hpa),
-            KubeResource::HorizontalPodAutoscaler(ref mut hpa),
+            KubeObject::HorizontalPodAutoscaler(payload_hpa),
+            KubeObject::HorizontalPodAutoscaler(ref mut hpa),
         ) => {
             hpa.spec = payload_hpa.spec.to_owned();
-            etcd_put(
-                &app_state,
-                format!("/api/v1/horizontalpodautoscalers/{}", hpa_name),
-                object,
-            )
-            .await?;
+            etcd_put(&app_state, &object).await?;
             let res = Response::new(
                 Some(format!("horizontalpodautoscaler/{} patched", hpa_name)),
                 None,

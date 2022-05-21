@@ -13,7 +13,7 @@ use reqwest::Url;
 use resources::{
     informer::Store,
     models::NodeConfig,
-    objects::{KubeObject, KubeResource},
+    objects::{ingress::Ingress, service::Service},
 };
 use tokio::sync::mpsc;
 
@@ -65,20 +65,13 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn reconfigure_nginx(
-    ingress_store: Store<KubeObject>,
-    svc_store: Store<KubeObject>,
-) -> Result<()> {
+async fn reconfigure_nginx(ingress_store: Store<Ingress>, svc_store: Store<Service>) -> Result<()> {
     let mut config = NginxIngressConfig::new();
     let ingress_store = ingress_store.read().await;
     let svc_store = svc_store.read().await;
 
     for (_, ingress) in ingress_store.iter() {
-        let ingress_rules = if let KubeResource::Ingress(ref res) = ingress.resource {
-            &res.spec.rules
-        } else {
-            continue;
-        };
+        let ingress_rules = &ingress.spec.rules;
 
         for rule in ingress_rules.iter() {
             let mut host = IngressHost::new(rule.host.as_ref().unwrap());
@@ -86,12 +79,7 @@ async fn reconfigure_nginx(
             for path in rule.paths.iter() {
                 let svc_uri = format!("/api/v1/services/{}", path.service.name);
                 if let Some(svc) = svc_store.get(svc_uri.as_str()) {
-                    let cluster_ip = if let KubeResource::Service(ref svc) = svc.resource {
-                        svc.spec.cluster_ip.as_ref().unwrap()
-                    } else {
-                        continue;
-                    };
-
+                    let cluster_ip = svc.spec.cluster_ip.as_ref().unwrap();
                     host.add_path(&path.path, cluster_ip, &path.service.port);
                     tracing::info!(
                         "add path {}{} for service {}:{}:{}",

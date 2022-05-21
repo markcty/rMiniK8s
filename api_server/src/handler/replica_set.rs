@@ -8,7 +8,7 @@ use axum::{
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{replica_set::ReplicaSetStatus, KubeObject, KubeResource},
+    objects::{replica_set::ReplicaSetStatus, KubeObject, Object},
 };
 use uuid::Uuid;
 
@@ -21,8 +21,8 @@ pub async fn create(
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::ReplicaSet(ref mut rs) = payload.resource {
-        let rs_name = &payload.metadata.name;
+    if let KubeObject::ReplicaSet(ref mut rs) = payload {
+        let rs_name = &rs.metadata.name.to_owned();
         let result = etcd_get_object(
             &app_state,
             format!("/api/v1/replicasets/{}", rs_name),
@@ -35,14 +35,10 @@ pub async fn create(
                 Some(format!("Replica set {} already exists", rs_name)),
             ));
         }
-        payload.metadata.uid = Some(Uuid::new_v4());
+        rs.metadata.uid = Some(Uuid::new_v4());
         rs.status = Some(ReplicaSetStatus::default());
-        etcd_put(
-            &app_state,
-            format!("/api/v1/replicasets/{}", rs_name),
-            &payload,
-        )
-        .await?;
+
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("replicaset/{} created", rs_name)), None);
         Ok(Json(res))
     } else {
@@ -86,12 +82,7 @@ pub async fn update(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     if payload.kind() == "replicaset" {
-        etcd_put(
-            &app_state,
-            format!("/api/v1/replicasets/{}", rs_name),
-            &payload,
-        )
-        .await?;
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("replicaset/{} updated", rs_name)), None);
         Ok(Json(res))
     } else {
@@ -114,15 +105,10 @@ pub async fn patch(
         Some("replicaset"),
     )
     .await?;
-    match (&payload.resource, &mut object.resource) {
-        (KubeResource::ReplicaSet(payload_rs), KubeResource::ReplicaSet(ref mut rs)) => {
+    match (&payload, &mut object) {
+        (KubeObject::ReplicaSet(payload_rs), KubeObject::ReplicaSet(ref mut rs)) => {
             rs.spec = payload_rs.spec.to_owned();
-            etcd_put(
-                &app_state,
-                format!("/api/v1/replicasets/{}", rs_name),
-                object,
-            )
-            .await?;
+            etcd_put(&app_state, &object).await?;
             let res = Response::new(Some(format!("replicaset/{} patched", rs_name)), None);
             Ok(Json(res))
         },

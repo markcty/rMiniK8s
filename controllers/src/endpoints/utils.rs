@@ -1,15 +1,9 @@
-use std::net::Ipv4Addr;
-
 use anyhow::{anyhow, Ok, Result};
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store},
     models,
     models::ErrResponse,
-    objects::{
-        KubeObject,
-        KubeResource::{Pod, Service},
-        Object,
-    },
+    objects::{pod::Pod, service::Service, KubeObject, Object},
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
@@ -19,13 +13,13 @@ use crate::{Notification, PodNtf, ResyncNtf, ServiceNtf, CONFIG};
 pub fn create_services_informer(
     tx: Sender<Notification>,
     resync_tx: Sender<ResyncNtf>,
-) -> Informer<KubeObject> {
+) -> Informer<Service> {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/services")?)
                     .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
+                    .json::<models::Response<Vec<Service>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
                 Ok(res)
@@ -72,13 +66,13 @@ pub fn create_services_informer(
 pub fn create_pods_informer(
     tx: Sender<Notification>,
     resync_tx: Sender<ResyncNtf>,
-) -> Informer<KubeObject> {
+) -> Informer<Pod> {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/pods")?)
                     .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
+                    .json::<models::Response<Vec<Pod>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
                 Ok(res)
@@ -137,72 +131,52 @@ pub fn create_pods_informer(
     Informer::new(lw, eh, rh)
 }
 
-pub async fn add_svc_endpoint(svc_store: Store<KubeObject>, pod: KubeObject) -> Result<()> {
-    let pod_ip = if let Pod(pod) = pod.resource {
-        if let Some(ip) = pod.get_ip() {
-            ip
-        } else {
-            return Ok(());
-        }
+pub async fn add_svc_endpoint(svc_store: Store<Service>, pod: Pod) -> Result<()> {
+    let pod_ip = if let Some(ip) = pod.get_ip() {
+        ip
     } else {
         return Ok(());
     };
 
     let mut store = svc_store.write().await;
-    for (_, svc_ref) in store.iter_mut() {
-        let svc = if let Service(ref mut svc) = svc_ref.resource {
-            svc
-        } else {
-            continue;
-        };
-
+    for (_, svc) in store.iter_mut() {
         if svc.spec.selector.matches(&pod.metadata.labels) && !svc.spec.endpoints.contains(&pod_ip)
         {
             svc.spec.endpoints.insert(pod_ip);
-            update_service(svc_ref).await?;
-            tracing::info!("Add endpoint {} for service {}", pod_ip, svc_ref.name());
+            update_service(svc).await?;
+            tracing::info!("Add endpoint {} for service {}", pod_ip, svc.name());
         }
     }
     Ok(())
 }
 
-pub async fn del_svc_endpoint(svc_store: Store<KubeObject>, pod: KubeObject) -> Result<()> {
-    let pod_ip = if let Pod(pod) = pod.resource {
-        if let Some(ip) = pod.get_ip() {
-            ip
-        } else {
-            return Ok(());
-        }
+pub async fn del_svc_endpoint(svc_store: Store<Service>, pod: Pod) -> Result<()> {
+    let pod_ip = if let Some(ip) = pod.get_ip() {
+        ip
     } else {
         return Ok(());
     };
 
     let mut store = svc_store.write().await;
-    for (_, svc_ref) in store.iter_mut() {
-        let svc = if let Service(ref mut svc) = svc_ref.resource {
-            svc
-        } else {
-            continue;
-        };
-
+    for (_, svc) in store.iter_mut() {
         if svc.spec.selector.matches(&pod.metadata.labels) && svc.spec.endpoints.contains(&pod_ip) {
             svc.spec.endpoints.retain(|ip| ip != &pod_ip);
-            update_service(svc_ref).await?;
+            update_service(svc).await?;
             tracing::info!(
                 "Remove endpoint {} for service {}",
                 pod_ip,
-                svc_ref.metadata.name
+                svc.metadata.name
             );
         }
     }
     Ok(())
 }
 
-pub async fn update_service(svc: &KubeObject) -> Result<()> {
+pub async fn update_service(svc: &Service) -> Result<()> {
     let client = reqwest::Client::new();
     let res = client
         .put(CONFIG.api_server_endpoint.join(svc.uri().as_str())?)
-        .json(svc)
+        .json(&KubeObject::Service(svc.to_owned()))
         .send()
         .await?;
     if res.error_for_status_ref().is_err() {
@@ -212,22 +186,20 @@ pub async fn update_service(svc: &KubeObject) -> Result<()> {
     Ok(())
 }
 
-pub async fn add_enpoints(pod_store: Store<KubeObject>, mut svc: KubeObject) -> Result<()> {
+pub async fn add_enpoints(pod_store: Store<Pod>, mut svc: Service) -> Result<()> {
     let mut svc_changed = false;
-    if let Service(ref mut svc_res) = svc.resource {
-        let mut store = pod_store.write().await;
-        for (_, pod) in store.iter_mut() {
-            let pod_ip = if let Some(ip) = get_pod_ip(pod) {
-                ip
-            } else {
-                continue;
-            };
+    let mut store = pod_store.write().await;
+    for (_, pod) in store.iter_mut() {
+        let pod_ip = if let Some(ip) = pod.get_ip() {
+            ip
+        } else {
+            continue;
+        };
 
-            if svc_res.spec.selector.matches(&pod.metadata.labels) {
-                svc_changed = true;
-                svc_res.spec.endpoints.insert(pod_ip);
-                tracing::info!("Add endpoint {} for service {}", pod_ip, svc.metadata.name);
-            }
+        if svc.spec.selector.matches(&pod.metadata.labels) {
+            svc_changed = true;
+            svc.spec.endpoints.insert(pod_ip);
+            tracing::info!("Add endpoint {} for service {}", pod_ip, svc.metadata.name);
         }
     }
 
@@ -235,18 +207,4 @@ pub async fn add_enpoints(pod_store: Store<KubeObject>, mut svc: KubeObject) -> 
         update_service(&svc).await?
     }
     Ok(())
-}
-
-pub fn get_pod_ip(pod: &KubeObject) -> Option<Ipv4Addr> {
-    if let Pod(pod) = &pod.resource {
-        Some(pod.get_ip()).flatten()
-    } else {
-        None
-    }
-}
-
-pub fn pod_ip_changed(pod1: &KubeObject, pod2: &KubeObject) -> bool {
-    let pod_ip1 = get_pod_ip(pod1);
-    let pod_ip2 = get_pod_ip(pod2);
-    pod_ip1 != pod_ip2
 }

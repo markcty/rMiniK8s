@@ -2,11 +2,23 @@ use std::{collections::HashSet, fmt::Debug, net::Ipv4Addr};
 
 use serde::{Deserialize, Serialize};
 
+use super::{Metadata, Object};
 use crate::objects::Labels;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Service {
+    pub metadata: Metadata,
     pub spec: ServiceSpec,
+}
+
+impl Object for Service {
+    fn kind(&self) -> &'static str {
+        "service"
+    }
+
+    fn name(&self) -> &String {
+        &self.metadata.name
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

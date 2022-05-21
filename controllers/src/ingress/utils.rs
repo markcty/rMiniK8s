@@ -2,20 +2,20 @@ use anyhow::anyhow;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler},
     models,
-    objects::KubeObject,
+    objects::{ingress::Ingress, service::Service},
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
 
 use crate::{Notification, CONFIG};
 
-pub fn create_svc_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
+pub fn create_svc_informer(tx: Sender<Notification>) -> Informer<Service> {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/services")?)
                     .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
+                    .json::<models::Response<Vec<Service>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
                 Ok(res)
@@ -71,13 +71,13 @@ pub fn create_svc_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
     Informer::new(lw, eh, rh)
 }
 
-pub fn create_ingress_informer(tx: Sender<Notification>) -> Informer<KubeObject> {
+pub fn create_ingress_informer(tx: Sender<Notification>) -> Informer<Ingress> {
     let lw = ListerWatcher {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get(CONFIG.api_server_endpoint.join("/api/v1/ingresses")?)
                     .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
+                    .json::<models::Response<Vec<Ingress>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
                 Ok(res)

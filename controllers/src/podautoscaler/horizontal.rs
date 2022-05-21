@@ -16,7 +16,8 @@ use resources::{
             HorizontalPodAutoscalerStatus, MetricTarget, PolicySelection, ResourceMetricSource,
             ScalingPolicyType,
         },
-        KubeObject, KubeResource, Labels,
+        pod::Pod,
+        KubeObject, Labels, Object,
     },
 };
 use tokio::{
@@ -53,7 +54,7 @@ pub struct PodAutoscaler {
     rx: Receiver<String>,
     resync_rx: Receiver<ResyncNotification>,
     hpa_informer: Option<JoinHandle<Result<(), Error>>>,
-    hpa_store: Store<KubeObject>,
+    hpa_store: Store<HorizontalPodAutoscaler>,
     pod_informer: Option<JoinHandle<Result<(), Error>>>,
 
     calculator: ReplicaCalculator,
@@ -149,105 +150,94 @@ impl PodAutoscaler {
         Ok(())
     }
 
-    async fn reconcile(&mut self, mut object: KubeObject) -> Result<()> {
+    async fn reconcile(&mut self, mut hpa: HorizontalPodAutoscaler) -> Result<()> {
         let now = Local::now().naive_utc();
-        match object.resource {
-            KubeResource::HorizontalPodAutoscaler(mut hpa) => {
-                let hpa_name = &object.metadata.name;
-                let mut target = get_scale_target(&hpa.spec.scale_target_ref).await?;
-                let status = hpa
-                    .status
-                    .as_ref()
-                    .with_context(|| "Failed to get HPA status")?;
+        let hpa_name = &hpa.metadata.name;
+        let mut target = get_scale_target(&hpa.spec.scale_target_ref).await?;
+        let status = hpa
+            .status
+            .as_ref()
+            .with_context(|| "Failed to get HPA status")?;
 
-                match target.resource {
-                    KubeResource::ReplicaSet(mut rs) => {
-                        let current_replicas = rs.spec.replicas;
-                        // Initialize recommendations when needed
-                        if !self.recommendations.contains_key(hpa_name) {
-                            self.recommendations
-                                .entry(hpa_name.to_owned())
-                                .or_insert_with(LinkedList::new)
-                                .push_back(Recommendation {
-                                    replicas: current_replicas,
-                                    time: now,
-                                });
-                        }
-
-                        let desired_replicas =
-                            if rs.spec.replicas == 0 && hpa.spec.min_replicas != 0 {
-                                // Scaling disabled
-                                0
-                            } else if current_replicas > hpa.spec.max_replicas {
-                                hpa.spec.max_replicas
-                            } else if current_replicas < hpa.spec.min_replicas {
-                                hpa.spec.min_replicas
-                            } else if current_replicas == 0 {
-                                1
-                            } else {
-                                let desired_replicas = self
-                                    .compute_resource_replicas(
-                                        &hpa.spec.metrics,
-                                        &hpa,
-                                        current_replicas,
-                                        &rs.spec.selector,
-                                    )
-                                    .await?;
-                                tracing::info!(
-                                    "Desired replicas for {}: {}",
-                                    hpa_name,
-                                    desired_replicas
-                                );
-                                self.normalize_desired_replicas(
-                                    hpa_name,
-                                    &hpa,
-                                    current_replicas,
-                                    desired_replicas,
-                                )
-                            };
-
-                        if current_replicas != desired_replicas {
-                            // Do scale
-                            rs.spec.replicas = desired_replicas;
-                            self.record_scale_event(
-                                hpa_name,
-                                &hpa.spec.behavior,
-                                current_replicas,
-                                desired_replicas,
-                            );
-                            target.resource = KubeResource::ReplicaSet(rs);
-                            post_update(&target).await?;
-                            tracing::info!(
-                                "Scaled {} from {} to {}",
-                                target.metadata.name,
-                                current_replicas,
-                                desired_replicas
-                            );
-                        }
-                        let new_status = HorizontalPodAutoscalerStatus {
-                            current_replicas,
-                            desired_replicas,
-                            last_scale_time: if current_replicas != desired_replicas {
-                                Some(now)
-                            } else {
-                                status.last_scale_time
-                            },
-                        };
-                        if !status.eq(&new_status) {
-                            // Update and post status
-                            hpa.status = Some(new_status);
-                            object.resource = KubeResource::HorizontalPodAutoscaler(hpa);
-                            post_update(&object).await?;
-                        }
-                    },
-                    _ => {
-                        tracing::warn!("{} is not scalable", target.kind());
-                    },
+        match target {
+            KubeObject::ReplicaSet(mut rs) => {
+                let current_replicas = rs.spec.replicas;
+                // Initialize recommendations when needed
+                if !self.recommendations.contains_key(hpa_name) {
+                    self.recommendations
+                        .entry(hpa_name.to_owned())
+                        .or_insert_with(LinkedList::new)
+                        .push_back(Recommendation {
+                            replicas: current_replicas,
+                            time: now,
+                        });
                 }
-                Ok(())
+
+                let desired_replicas = if rs.spec.replicas == 0 && hpa.spec.min_replicas != 0 {
+                    // Scaling disabled
+                    0
+                } else if current_replicas > hpa.spec.max_replicas {
+                    hpa.spec.max_replicas
+                } else if current_replicas < hpa.spec.min_replicas {
+                    hpa.spec.min_replicas
+                } else if current_replicas == 0 {
+                    1
+                } else {
+                    let desired_replicas = self
+                        .compute_resource_replicas(
+                            &hpa.spec.metrics,
+                            &hpa,
+                            current_replicas,
+                            &rs.spec.selector,
+                        )
+                        .await?;
+                    tracing::info!("Desired replicas for {}: {}", hpa_name, desired_replicas);
+                    self.normalize_desired_replicas(
+                        hpa_name,
+                        &hpa,
+                        current_replicas,
+                        desired_replicas,
+                    )
+                };
+
+                if current_replicas != desired_replicas {
+                    // Do scale
+                    rs.spec.replicas = desired_replicas;
+                    self.record_scale_event(
+                        hpa_name,
+                        &hpa.spec.behavior,
+                        current_replicas,
+                        desired_replicas,
+                    );
+                    target = KubeObject::ReplicaSet(rs);
+                    post_update(&target).await?;
+                    tracing::info!(
+                        "Scaled {} from {} to {}",
+                        target.name(),
+                        current_replicas,
+                        desired_replicas
+                    );
+                }
+                let new_status = HorizontalPodAutoscalerStatus {
+                    current_replicas,
+                    desired_replicas,
+                    last_scale_time: if current_replicas != desired_replicas {
+                        Some(now)
+                    } else {
+                        status.last_scale_time
+                    },
+                };
+                if !status.eq(&new_status) {
+                    // Update and post status
+                    hpa.status = Some(new_status);
+                    post_update(&KubeObject::HorizontalPodAutoscaler(hpa)).await?;
+                }
             },
-            _ => Err(anyhow::anyhow!("Unknown object type")),
+            _ => {
+                tracing::warn!("{} is not scalable", target.kind());
+            },
         }
+        Ok(())
     }
 
     async fn compute_resource_replicas(
@@ -552,12 +542,12 @@ impl PodAutoscaler {
     fn create_hpa_informer(
         tx: Sender<String>,
         resync_tx: Sender<ResyncNotification>,
-    ) -> Informer<KubeObject> {
+    ) -> Informer<HorizontalPodAutoscaler> {
         let lw = create_lister_watcher("horizontalpodautoscalers".to_string());
 
         let tx_add = tx;
         let tx_update = tx_add.clone();
-        let eh = EventHandler::<KubeObject> {
+        let eh = EventHandler::<HorizontalPodAutoscaler> {
             add_cls: Box::new(move |new| {
                 let tx_add = tx_add.clone();
                 Box::pin(async move {
@@ -568,14 +558,8 @@ impl PodAutoscaler {
             update_cls: Box::new(move |(old, new)| {
                 let tx_update = tx_update.clone();
                 Box::pin(async move {
-                    if let (
-                        KubeResource::HorizontalPodAutoscaler(old_hpa),
-                        KubeResource::HorizontalPodAutoscaler(new_hpa),
-                    ) = (old.resource, new.resource)
-                    {
-                        if old_hpa.spec != new_hpa.spec {
-                            tx_update.send(new.metadata.name).await?;
-                        }
+                    if old.spec != new.spec {
+                        tx_update.send(new.metadata.name).await?;
                     }
                     Ok(())
                 })
@@ -593,9 +577,9 @@ impl PodAutoscaler {
         Informer::new(lw, eh, rh)
     }
 
-    fn create_pod_informer() -> Informer<KubeObject> {
+    fn create_pod_informer() -> Informer<Pod> {
         let lw = create_lister_watcher("pods".to_string());
-        let eh = EventHandler::<KubeObject> {
+        let eh = EventHandler::<Pod> {
             add_cls: Box::new(move |_| Box::pin(async move { Ok(()) })),
             update_cls: Box::new(move |(_, __)| Box::pin(async move { Ok(()) })),
             delete_cls: Box::new(move |_| Box::pin(async move { Ok(()) })),

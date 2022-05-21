@@ -8,7 +8,7 @@ use axum::{
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{KubeObject, KubeResource, Object},
+    objects::{KubeObject, Object},
 };
 use uuid::Uuid;
 
@@ -21,8 +21,8 @@ pub async fn create(
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::Ingress(ref mut ingress) = payload.resource {
-        payload.metadata.uid = Some(Uuid::new_v4());
+    if let KubeObject::Ingress(ref mut ingress) = payload {
+        ingress.metadata.uid = Some(Uuid::new_v4());
 
         for rule in ingress.spec.rules.iter_mut() {
             if rule.host.is_none() {
@@ -30,7 +30,7 @@ pub async fn create(
             }
         }
 
-        etcd_put(&app_state, payload.uri(), &payload).await?;
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("ingress/{} created", payload.name())), None);
         Ok(Json(res))
     } else {
@@ -48,8 +48,8 @@ pub async fn update(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::Ingress(_) = payload.resource {
-        etcd_put(&app_state, payload.uri(), &payload).await?;
+    if let KubeObject::Ingress(_) = payload {
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("ingress/{} updated", payload.name())), None);
         Ok(Json(res))
     } else {

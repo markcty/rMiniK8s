@@ -2,7 +2,7 @@ use anyhow::{Ok, Result};
 use resources::{
     models,
     objects::{
-        binding::Binding, object_reference::ObjectReference, KubeObject, KubeResource, Metadata,
+        binding::Binding, object_reference::ObjectReference, pod::Pod, KubeObject, Metadata, Object,
     },
 };
 use tokio::sync::mpsc::Receiver;
@@ -11,7 +11,7 @@ use crate::cache::Cache;
 
 pub struct Scheduler<T>
 where
-    T: Fn(&KubeObject, &Cache) -> ObjectReference,
+    T: Fn(&Pod, &Cache) -> ObjectReference,
 {
     cache: Cache,
     algorithm: T,
@@ -20,7 +20,7 @@ where
 
 impl<T> Scheduler<T>
 where
-    T: Fn(&KubeObject, &Cache) -> ObjectReference,
+    T: Fn(&Pod, &Cache) -> ObjectReference,
 {
     pub fn new(algorithm: T, cache: Cache) -> Scheduler<T> {
         Scheduler {
@@ -30,7 +30,7 @@ where
         }
     }
 
-    pub async fn run(&self, mut pod_queue: Receiver<KubeObject>) -> Result<()> {
+    pub async fn run(&self, mut pod_queue: Receiver<Pod>) -> Result<()> {
         tracing::info!("scheduler started");
 
         while let Some(pod) = pod_queue.recv().await {
@@ -42,18 +42,16 @@ where
         Ok(())
     }
 
-    async fn bind(&self, pod: KubeObject, node: ObjectReference) -> Result<()> {
-        let binding = KubeObject {
+    async fn bind(&self, pod: Pod, node: ObjectReference) -> Result<()> {
+        let binding = KubeObject::Binding(Binding {
             metadata: Metadata {
-                name: pod.name(),
+                name: pod.name().to_owned(),
                 uid: pod.metadata.uid,
                 labels: pod.metadata.labels,
                 ..Default::default()
             },
-            resource: KubeResource::Binding(Binding {
-                target: node,
-            }),
-        };
+            target: node,
+        });
 
         let res = self
             .client

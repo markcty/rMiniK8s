@@ -8,7 +8,7 @@ use axum::{
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{pod::PodPhase, KubeObject, KubeResource},
+    objects::{pod::PodPhase, KubeObject, Object},
 };
 use uuid::Uuid;
 
@@ -21,15 +21,16 @@ pub async fn create(
     Json(mut payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // TODO: validate payload
-    if let KubeResource::Pod(ref mut pod) = payload.resource {
-        payload.metadata.uid = Some(Uuid::new_v4());
-        payload.metadata.name = unique_name(&payload.metadata.name);
-        let pod_name = &payload.metadata.name;
+    if let KubeObject::Pod(ref mut pod) = payload {
+        pod.metadata.uid = Some(Uuid::new_v4());
+        pod.metadata.name = unique_name(&pod.metadata.name);
+        let pod_name = pod.metadata.name.to_owned();
 
         let mut status = pod.status.clone().unwrap_or_default();
         status.phase = PodPhase::Pending;
         pod.status = Some(status);
-        etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &payload).await?;
+
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("pod/{} created", pod_name)), None);
         Ok(Json(res))
     } else {
@@ -63,7 +64,7 @@ pub async fn replace(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     if payload.kind() == "pod" {
-        etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &payload).await?;
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("pod/{} replaced", pod_name)), None);
         Ok(Json(res))
     } else {

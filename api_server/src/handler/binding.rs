@@ -6,7 +6,7 @@ use resources::{
     models::{ErrResponse, Response},
     objects::{
         pod::{PodCondition, PodConditionType},
-        KubeObject, KubeResource,
+        KubeObject, Object,
     },
 };
 
@@ -25,13 +25,11 @@ pub async fn bind(
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
     // check payload
-    if let KubeResource::Binding(binding) = &payload.resource {
-        let pod_name = payload.name();
+    if let KubeObject::Binding(binding) = &payload {
         // get pod object
-        let mut object: KubeObject =
-            etcd_get_object(&app_state, format!("/api/v1/pods/{}", pod_name), None).await?;
+        let mut object: KubeObject = etcd_get_object(&app_state, payload.uri(), None).await?;
         // update pod
-        if let KubeResource::Pod(ref mut pod) = object.resource {
+        if let KubeObject::Pod(ref mut pod) = object {
             let mut status = pod.status.clone().unwrap_or_default();
             status.conditions.insert(
                 PodConditionType::PodScheduled,
@@ -57,13 +55,8 @@ pub async fn bind(
             ));
         }
         // put it back
-        etcd_put(&app_state, format!("/api/v1/pods/{}", pod_name), &object).await?;
-        etcd_put(
-            &app_state,
-            format!("/api/v1/bindings/{}", pod_name),
-            &payload,
-        )
-        .await?;
+        etcd_put(&app_state, &object).await?;
+        etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some("bind successfully".to_string()), None);
         Ok(Json(res))
     } else {

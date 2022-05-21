@@ -3,7 +3,7 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store, WsStream},
     models,
-    objects::KubeObject,
+    objects::{node::Node, pod::Pod, Object},
 };
 use tokio::{
     sync::mpsc::{self, Receiver},
@@ -11,24 +11,20 @@ use tokio::{
 };
 use tokio_tungstenite::connect_async;
 
-pub type RunInformerResult = (
-    Receiver<KubeObject>,
-    Store<KubeObject>,
-    JoinHandle<Result<(), Error>>,
-);
+pub type RunInformerResult<T> = (Receiver<T>, Store<T>, JoinHandle<Result<(), Error>>);
 
-pub fn run_pod_informer() -> RunInformerResult {
+pub fn run_pod_informer() -> RunInformerResult<Pod> {
     // create list watcher closures
     // TODO: maybe some crate or macros can simplify the tedious boxed closure creation in heap
-    let lw = ListerWatcher {
+    let lw = ListerWatcher::<Pod> {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get("http://localhost:8080/api/v1/pods")
                     .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
+                    .json::<models::Response<Vec<Pod>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok::<Vec<Pod>, Error>(res)
             })
         }),
         watcher: Box::new(|_| {
@@ -41,18 +37,14 @@ pub fn run_pod_informer() -> RunInformerResult {
     };
 
     // create event handler closures
-    let (tx_add, rx) = mpsc::channel::<KubeObject>(16);
-    let eh = EventHandler::<KubeObject> {
+    let (tx_add, rx) = mpsc::channel::<Pod>(16);
+    let eh = EventHandler::<Pod> {
         add_cls: Box::new(move |pod| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();
             Box::pin(async move {
-                if pod.kind() == "pod" {
-                    tracing::debug!("add\n{}", pod.name());
-                    tx_add.send(pod).await?;
-                } else {
-                    tracing::error!("There are some errors with the kind of object.");
-                }
+                tracing::debug!("add\n{}", pod.name());
+                tx_add.send(pod).await?;
                 Ok(())
             })
         }),
@@ -85,18 +77,18 @@ pub fn run_pod_informer() -> RunInformerResult {
     (rx, store, informer_handler)
 }
 
-pub fn run_node_informer() -> RunInformerResult {
+pub fn run_node_informer() -> RunInformerResult<Node> {
     // create list watcher closures
     // TODO: maybe some crate or macros can simplify the tedious boxed closure creation in heap
-    let lw = ListerWatcher {
+    let lw = ListerWatcher::<Node> {
         lister: Box::new(|_| {
             Box::pin(async {
                 let res = reqwest::get("http://localhost:8080/api/v1/nodes")
                     .await?
-                    .json::<models::Response<Vec<KubeObject>>>()
+                    .json::<models::Response<Vec<Node>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok::<Vec<Node>, Error>(res)
             })
         }),
         watcher: Box::new(|_| {
@@ -109,8 +101,8 @@ pub fn run_node_informer() -> RunInformerResult {
     };
 
     // create event handler closures
-    let (_, rx) = mpsc::channel::<KubeObject>(16);
-    let eh = EventHandler::<KubeObject> {
+    let (_, rx) = mpsc::channel::<Node>(16);
+    let eh = EventHandler::<Node> {
         add_cls: Box::new(move |node| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             Box::pin(async move {

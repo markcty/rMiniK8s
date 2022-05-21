@@ -1,8 +1,8 @@
-use resources::objects::KubeObject;
+use resources::objects::pod::Pod;
 
 #[derive(Debug)]
 pub enum PodUpdate {
-    Add(KubeObject),
-    Update(KubeObject),
-    Delete(KubeObject),
+    Add(Pod),
+    Update(Pod),
+    Delete(Pod),
 }

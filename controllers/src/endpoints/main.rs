@@ -8,10 +8,10 @@ use reqwest::Url;
 use resources::{
     informer::Store,
     models::NodeConfig,
-    objects::{KubeObject, KubeResource::Service},
+    objects::{pod::Pod, service::Service},
 };
 use tokio::{select, sync::mpsc};
-use utils::{get_pod_ip, pod_ip_changed, update_service};
+use utils::update_service;
 lazy_static! {
     static ref CONFIG: NodeConfig = {
         dotenv::from_path("/etc/rminik8s/node.env").ok();
@@ -43,14 +43,14 @@ pub enum Notification {
 
 #[derive(Debug)]
 pub enum PodNtf {
-    Add(KubeObject),
-    Update(KubeObject, KubeObject),
-    Delete(KubeObject),
+    Add(Pod),
+    Update(Pod, Pod),
+    Delete(Pod),
 }
 
 #[derive(Debug)]
 pub enum ServiceNtf {
-    Add(KubeObject),
+    Add(Service),
 }
 
 #[derive(Debug)]
@@ -95,21 +95,17 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn handle_resync(pod_store: Store<KubeObject>, svc_store: Store<KubeObject>) -> Result<()> {
+async fn handle_resync(pod_store: Store<Pod>, svc_store: Store<Service>) -> Result<()> {
     tracing::info!("Resync ...");
 
     let mut svc_store = svc_store.write().await;
     let pod_store = pod_store.read().await;
     for (_, svc) in svc_store.iter_mut() {
-        let svc_spec = if let Service(ref mut svc) = svc.resource {
-            &mut svc.spec
-        } else {
-            continue;
-        };
+        let svc_spec = &mut svc.spec;
         let mut new_eps: HashSet<Ipv4Addr> = HashSet::new();
 
         for (_, pod) in pod_store.iter() {
-            if let Some(pod_ip) = get_pod_ip(pod) {
+            if let Some(pod_ip) = pod.get_ip() {
                 if svc_spec.selector.matches(&pod.metadata.labels) {
                     new_eps.insert(pod_ip);
                 }
@@ -127,8 +123,8 @@ async fn handle_resync(pod_store: Store<KubeObject>, svc_store: Store<KubeObject
 }
 
 async fn handle_notification(
-    pod_store: Store<KubeObject>,
-    svc_store: Store<KubeObject>,
+    pod_store: Store<Pod>,
+    svc_store: Store<Service>,
     n: Notification,
 ) -> Result<()> {
     if let Notification::Pod(n) = n {
@@ -137,7 +133,7 @@ async fn handle_notification(
                 add_svc_endpoint(svc_store.to_owned(), new).await?;
             },
             PodNtf::Update(old, new) => {
-                if pod_ip_changed(&old, &new) {
+                if old.get_ip() != new.get_ip() {
                     del_svc_endpoint(svc_store.to_owned(), old).await?;
                     add_svc_endpoint(svc_store.to_owned(), new).await?;
                 }

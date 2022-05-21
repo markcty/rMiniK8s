@@ -3,13 +3,13 @@ use reqwest::Url;
 use resources::{
     informer::{ListerWatcher, WsStream},
     models::Response,
-    objects::{object_reference::ObjectReference, KubeObject},
+    objects::{object_reference::ObjectReference, KubeObject, Object},
 };
 use tokio_tungstenite::connect_async;
 
 use crate::CONFIG;
 
-pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
+pub fn create_lister_watcher<T: Object>(path: String) -> ListerWatcher<T> {
     let list_url = format!("{}/api/v1/{}", CONFIG.api_server_url, path);
     let watch_url = format!("{}/api/v1/watch/{}", CONFIG.api_server_watch_url, path);
     ListerWatcher {
@@ -18,10 +18,10 @@ pub fn create_lister_watcher(path: String) -> ListerWatcher<KubeObject> {
             Box::pin(async {
                 let res = reqwest::get(list_url)
                     .await?
-                    .json::<Response<Vec<KubeObject>>>()
+                    .json::<Response<Vec<T>>>()
                     .await?;
                 let res = res.data.ok_or_else(|| anyhow!("Lister failed"))?;
-                Ok::<Vec<KubeObject>, Error>(res)
+                Ok::<Vec<T>, Error>(res)
             })
         }),
         watcher: Box::new(move |_| {
@@ -57,12 +57,7 @@ pub async fn get_scale_target(target: &ObjectReference) -> Result<KubeObject> {
 pub async fn post_update(object: &KubeObject) -> Result<()> {
     let client = reqwest::Client::new();
     let response = client
-        .put(format!(
-            "{}/api/v1/{}s/{}",
-            CONFIG.api_server_url,
-            object.kind(),
-            object.name(),
-        ))
+        .put(format!("{}{}", CONFIG.api_server_url, object.uri()))
         .json(object)
         .send()
         .await?

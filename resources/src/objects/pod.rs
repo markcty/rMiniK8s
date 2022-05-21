@@ -5,12 +5,23 @@ use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-use super::{metrics, Metadata};
+use super::{metrics, Metadata, Object};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pod {
+    pub metadata: Metadata,
     pub spec: PodSpec,
     pub status: Option<PodStatus>,
+}
+
+impl Object for Pod {
+    fn kind(&self) -> &'static str {
+        "pod"
+    }
+
+    fn name(&self) -> &String {
+        &self.metadata.name
+    }
 }
 
 impl Pod {
