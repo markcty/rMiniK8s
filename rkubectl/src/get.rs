@@ -1,3 +1,5 @@
+use std::vec::Vec;
+
 use anyhow::{anyhow, Context, Result};
 use clap::Args;
 use reqwest::blocking::Client;
@@ -24,10 +26,16 @@ impl Arg {
     pub fn handle(&self) -> Result<()> {
         let client = Client::new();
         let url = gen_url(self.kind.to_string(), self.name.as_ref())?;
-        let res = client
-            .get(url)
-            .send()?
-            .json::<Response<Vec<KubeObject>>>()?;
+        let data = if self.name.is_none() {
+            let res = client
+                .get(url)
+                .send()?
+                .json::<Response<Vec<KubeObject>>>()?;
+            res.data.unwrap_or_default()
+        } else {
+            let res = client.get(url).send()?.json::<Response<KubeObject>>()?;
+            res.data.map_or_else(Vec::new, |data| vec![data])
+        };
 
         match self.kind {
             ResourceKind::Pods => {
@@ -35,7 +43,7 @@ impl Arg {
                     "{:<20} {:<10} {:<8} {:<10}",
                     "NAME", "STATUS", "RESTARTS", "AGE"
                 );
-                for object in res.data.unwrap() {
+                for object in data {
                     if let Pod(pod) = object {
                         let status = pod.status.as_ref().unwrap();
                         let restarts = status
@@ -58,7 +66,7 @@ impl Arg {
                     "{:<20} {:<8} {:<8} {:<8}",
                     "NAME", "DESIRED", "CURRENT", "READY"
                 );
-                for object in res.data.unwrap() {
+                for object in data {
                     if let ReplicaSet(rs) = object {
                         let status = rs.status.unwrap_or_default();
                         println!(
@@ -76,7 +84,7 @@ impl Arg {
                     "{:<20} {:<16} {:<20} {:<}",
                     "NAME", "CLUSTER-IP", "PORTS", "ENDPOINTS"
                 );
-                for object in res.data.unwrap() {
+                for object in data {
                     if let Service(svc) = object {
                         let ports = svc
                             .spec
@@ -112,7 +120,7 @@ impl Arg {
             },
             ResourceKind::Ingresses => {
                 println!("{:<20} {:<30} PATH:SERVICE:PORT", "NAME", "HOST");
-                for object in res.data.unwrap() {
+                for object in data {
                     if let Ingress(ingress) = object {
                         let name = ingress.metadata.name;
                         for rule in ingress.spec.rules {
@@ -138,7 +146,7 @@ impl Arg {
                     "{:<16} {:<24} {:<8} {:<8} {:<}",
                     "NAME", "REFERENCE", "CURRENT", "DESIRED", "LAST SCALE"
                 );
-                for object in res.data.unwrap() {
+                for object in data {
                     if let HorizontalPodAutoscaler(hpa) = object {
                         let status = hpa
                             .status
