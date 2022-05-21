@@ -12,7 +12,7 @@ pub struct Node {
 
 impl Object for Node {
     fn kind(&self) -> &'static str {
-        "node"
+        "Node"
     }
 
     fn name(&self) -> &String {

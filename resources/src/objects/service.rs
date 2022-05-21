@@ -13,7 +13,7 @@ pub struct Service {
 
 impl Object for Service {
     fn kind(&self) -> &'static str {
-        "service"
+        "Service"
     }
 
     fn name(&self) -> &String {

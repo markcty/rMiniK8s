@@ -23,12 +23,7 @@ pub async fn create(
     // TODO: validate payload
     if let KubeObject::ReplicaSet(ref mut rs) = payload {
         let rs_name = &rs.metadata.name.to_owned();
-        let result = etcd_get_object(
-            &app_state,
-            format!("/api/v1/replicasets/{}", rs_name),
-            Some("replicaset"),
-        )
-        .await;
+        let result = etcd_get_object(&app_state, rs.uri(), Some("replicaset")).await;
         if result.is_ok() {
             return Err(ErrResponse::new(
                 String::from("Error creating replica set"),
@@ -81,7 +76,7 @@ pub async fn update(
     Path(rs_name): Path<String>,
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
-    if payload.kind() == "replicaset" {
+    if let KubeObject::ReplicaSet(_) = payload {
         etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("replicaset/{} updated", rs_name)), None);
         Ok(Json(res))

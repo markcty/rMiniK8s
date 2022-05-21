@@ -10,11 +10,11 @@ pub struct Ingress {
 
 impl Object for Ingress {
     fn kind(&self) -> &'static str {
-        "ingress"
+        "Ingress"
     }
 
     fn kind_plural(&self) -> String {
-        "ingresses".to_string()
+        "Ingresses".to_string()
     }
 
     fn name(&self) -> &String {

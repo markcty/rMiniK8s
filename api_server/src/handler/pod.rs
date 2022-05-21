@@ -63,7 +63,7 @@ pub async fn replace(
     Path(pod_name): Path<String>,
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
-    if payload.kind() == "pod" {
+    if let KubeObject::Pod(_) = payload {
         etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("pod/{} replaced", pod_name)), None);
         Ok(Json(res))

@@ -12,7 +12,7 @@ pub struct HorizontalPodAutoscaler {
 
 impl Object for HorizontalPodAutoscaler {
     fn kind(&self) -> &'static str {
-        "horizontalpodautoscaler"
+        "HorizontalPodAutoscaler"
     }
 
     fn name(&self) -> &String {

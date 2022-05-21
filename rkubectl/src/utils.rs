@@ -11,12 +11,13 @@ pub fn gen_url_from_object(object: &KubeObject) -> Result<Url> {
     Ok(url.join(uri.as_str())?)
 }
 
-pub fn gen_url(kind: String, name: Option<&String>) -> Result<Url> {
+pub fn gen_url(mut kind_plural: String, name: Option<&String>) -> Result<Url> {
     let url = CONFIG.base_url.to_owned();
+    kind_plural = kind_plural.to_lowercase();
     let path = if let Some(name) = name {
-        format!("api/v1/{}/{}", kind, name)
+        format!("api/v1/{}/{}", kind_plural, name)
     } else {
-        format!("api/v1/{}", kind)
+        format!("api/v1/{}", kind_plural)
     };
     Ok(url.join(path.as_str())?)
 }

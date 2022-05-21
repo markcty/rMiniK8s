@@ -23,12 +23,7 @@ pub async fn create(
     // TODO: validate payload
     if let KubeObject::HorizontalPodAutoscaler(mut hpa) = payload {
         let hpa_name = hpa.metadata.name.to_owned();
-        let result = etcd_get_object(
-            &app_state,
-            format!("/api/v1/horizontalpodautoscalers/{}", hpa_name),
-            Some("horizontalpodautoscaler"),
-        )
-        .await;
+        let result = etcd_get_object(&app_state, hpa.uri(), Some("horizontalpodautoscaler")).await;
         if result.is_ok() {
             return Err(ErrResponse::new(
                 String::from("Error creating horizontal pod autoscaler"),
@@ -139,7 +134,7 @@ pub async fn update(
         Some("horizontalpodautoscaler"),
     )
     .await?;
-    if payload.kind() == "horizontalpodautoscaler" {
+    if let KubeObject::HorizontalPodAutoscaler(_) = payload {
         etcd_put(&app_state, &payload).await?;
         let res = Response::new(
             Some(format!("horizontalpodautoscaler/{} updated", hpa_name)),

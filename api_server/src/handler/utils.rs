@@ -62,7 +62,7 @@ pub async fn etcd_get_objects_by_prefix(
         })?;
 
         if let Some(kind) = kind {
-            if object.kind() == kind {
+            if object.kind().eq_ignore_ascii_case(kind) {
                 objects.push(object);
             } else {
                 tracing::error!(
@@ -90,7 +90,7 @@ pub async fn etcd_get_object(
     let object: KubeObject = serde_json::from_str(object_str.as_str())
         .map_err(|err| ErrResponse::new("failed to deserialize".into(), Some(err.to_string())))?;
     if let Some(kind) = kind {
-        if object.kind() != kind {
+        if !object.kind().eq_ignore_ascii_case(kind) {
             return Err(ErrResponse::new("get object type error".to_string(), None));
         }
     }

@@ -16,7 +16,7 @@ pub struct Pod {
 
 impl Object for Pod {
     fn kind(&self) -> &'static str {
-        "pod"
+        "Pod"
     }
 
     fn name(&self) -> &String {

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::{Context, Result};
+use enum_dispatch::enum_dispatch;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use strum::Display;
 use uuid::Uuid;
@@ -18,6 +19,7 @@ pub mod replica_set;
 pub mod service;
 
 #[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq)]
+#[enum_dispatch(Object)]
 #[serde(tag = "kind")]
 pub enum KubeObject {
     Pod(pod::Pod),
@@ -27,32 +29,6 @@ pub enum KubeObject {
     ReplicaSet(replica_set::ReplicaSet),
     Ingress(ingress::Ingress),
     HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
-}
-
-impl Object for KubeObject {
-    fn kind(&self) -> &'static str {
-        match self {
-            KubeObject::Pod(pod) => pod.kind(),
-            KubeObject::Binding(binding) => binding.kind(),
-            KubeObject::Node(node) => node.kind(),
-            KubeObject::Service(service) => service.kind(),
-            KubeObject::ReplicaSet(replica_set) => replica_set.kind(),
-            KubeObject::Ingress(ingress) => ingress.kind(),
-            KubeObject::HorizontalPodAutoscaler(hpa) => hpa.kind(),
-        }
-    }
-
-    fn name(&self) -> &String {
-        match self {
-            KubeObject::Pod(pod) => pod.name(),
-            KubeObject::Binding(binding) => binding.name(),
-            KubeObject::Node(node) => node.name(),
-            KubeObject::Service(service) => service.name(),
-            KubeObject::ReplicaSet(replica_set) => replica_set.name(),
-            KubeObject::Ingress(ingress) => ingress.name(),
-            KubeObject::HorizontalPodAutoscaler(hpa) => hpa.name(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -83,13 +59,16 @@ pub struct Metadata {
     pub owner_references: Vec<ObjectReference>,
 }
 
+#[enum_dispatch]
 pub trait Object:
     Clone + Serialize + DeserializeOwned + Send + Sync + Debug + PartialEq + 'static
 {
     /// Return the kind of the object
+    /// e.g. "Pod"
     fn kind(&self) -> &'static str;
 
     /// Return the kind of the object in plural
+    /// e.g. "Pods"
     fn kind_plural(&self) -> String {
         self.kind().to_string() + "s"
     }
@@ -98,9 +77,9 @@ pub trait Object:
     fn name(&self) -> &String;
 
     /// Return the prefix of the object in Etcd,
-    /// e.g. "pod" -> "/api/v1/pods"
+    /// e.g. Pod -> "/api/v1/pods"
     fn prefix(&self) -> String {
-        format!("/api/v1/{}", self.kind_plural())
+        format!("/api/v1/{}", self.kind_plural().to_lowercase())
     }
 
     /// Return the URI of the project in Etcd

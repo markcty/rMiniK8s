@@ -11,7 +11,7 @@ use resources::{
         object_reference::ObjectReference,
         pod::{Pod, PodPhase},
         replica_set::{ReplicaSet, ReplicaSetStatus},
-        KubeObject,
+        KubeObject, Object,
     },
 };
 use tokio::{
@@ -174,10 +174,7 @@ impl ReplicaSetController {
         let client = reqwest::Client::new();
         let name = rs.metadata.name.to_owned();
         let response = client
-            .put(format!(
-                "{}/api/v1/replicasets/{}",
-                CONFIG.api_server_url, name
-            ))
+            .put(format!("{}{}", CONFIG.api_server_url, rs.uri()))
             .json(&KubeObject::ReplicaSet(rs))
             .send()
             .await?

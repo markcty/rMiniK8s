@@ -17,7 +17,7 @@ pub struct ReplicaSet {
 
 impl Object for ReplicaSet {
     fn kind(&self) -> &'static str {
-        "replicaset"
+        "ReplicaSet"
     }
 
     fn name(&self) -> &String {

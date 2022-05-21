@@ -60,7 +60,6 @@ pub async fn list(
         .unwrap()
         .get()
         .await;
-    tracing::info!("{:?}", response);
     let containers = unwrap_vector_result(response)?;
     for container in containers {
         if let Some(names) = get_names(&container.labels) {

@@ -10,7 +10,7 @@ pub struct Binding {
 
 impl Object for Binding {
     fn kind(&self) -> &'static str {
-        "binding"
+        "Binding"
     }
 
     fn name(&self) -> &String {
