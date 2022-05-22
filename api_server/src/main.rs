@@ -35,7 +35,7 @@ pub struct AppState {
 async fn main() -> Result<()> {
     // read config
     let config = Config::builder()
-        .add_source(config::File::with_name("./examples/api-server/config.yaml"))
+        .add_source(config::File::with_name("/etc/minik8s/api_server.yaml"))
         .build()?
         .try_deserialize::<ServerConfig>()
         .with_context(|| "Failed to parse config".to_string())?;

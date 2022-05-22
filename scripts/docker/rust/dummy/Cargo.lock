@@ -56,34 +56,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "api_server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "axum-macros",
- "chrono",
- "config",
- "dashmap",
- "deadpool",
- "etcd-client",
- "futures",
- "lazy_static",
- "prometheus-http-api",
- "rand",
- "resources",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "ascii"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -581,27 +553,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "controllers"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "config",
- "dotenv",
- "futures-delay-queue",
- "futures-intrusive",
- "lazy_static",
- "nginx-config",
- "parking_lot 0.12.0",
- "reqwest",
- "resources",
- "tokio",
- "tokio-tungstenite",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -754,6 +705,48 @@ name = "dotenv"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
+name = "dummy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "axum-macros",
+ "bollard",
+ "chrono",
+ "chrono-humanize",
+ "clap",
+ "config",
+ "dashmap",
+ "deadpool",
+ "dotenv",
+ "enum_dispatch",
+ "etcd-client",
+ "futures",
+ "futures-delay-queue",
+ "futures-intrusive",
+ "futures-util",
+ "iptables",
+ "lazy_static",
+ "nginx-config",
+ "parking_lot 0.12.0",
+ "prometheus-http-api",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "strum",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
 
 [[package]]
 name = "either"
@@ -2020,90 +2013,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "resources"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "bollard",
- "chrono",
- "dashmap",
- "enum_dispatch",
- "etcd-client",
- "futures",
- "futures-util",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "strum",
- "tokio",
- "tokio-tungstenite",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "retain_mut"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4389f1d5789befaf6029ebd9f7dac4af7f7e3d61b69d4f30e2ac02b57e7712b0"
-
-[[package]]
-name = "rkube-proxy"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dashmap",
- "dotenv",
- "iptables",
- "lazy_static",
- "rand",
- "reqwest",
- "resources",
- "tokio",
- "tokio-tungstenite",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "rkubectl"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "chrono-humanize",
- "clap",
- "lazy_static",
- "reqwest",
- "resources",
- "serde",
- "serde_yaml",
- "strum",
-]
-
-[[package]]
-name = "rkubelet"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bollard",
- "clap",
- "config",
- "futures",
- "lazy_static",
- "reqwest",
- "resources",
- "serde",
- "serde_json",
- "serde_yaml",
- "tokio",
- "tokio-tungstenite",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
 
 [[package]]
 name = "ron"
@@ -2152,21 +2065,6 @@ checksum = "88d6731146462ea25d9244b2ed5fd1d716d25c52e4d54aa4fb0f3c4e9854dbe2"
 dependencies = [
  "lazy_static",
  "windows-sys",
-]
-
-[[package]]
-name = "scheduler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dashmap",
- "reqwest",
- "resources",
- "serde_json",
- "tokio",
- "tokio-tungstenite",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
