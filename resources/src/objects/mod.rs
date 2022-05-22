@@ -9,6 +9,7 @@ use uuid::Uuid;
 use self::object_reference::ObjectReference;
 
 pub mod binding;
+pub mod gpu_job;
 pub mod hpa;
 pub mod ingress;
 pub mod metrics;
@@ -29,6 +30,7 @@ pub enum KubeObject {
     ReplicaSet(replica_set::ReplicaSet),
     Ingress(ingress::Ingress),
     HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
+    GpuJob(gpu_job::GpuJob),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
