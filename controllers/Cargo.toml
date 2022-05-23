@@ -42,3 +42,4 @@ tracing-subscriber = "0.3.10"
 lazy_static = "1.4.0"
 dotenv = "0.15.0"
 nginx-config = "0.13.2"
+serde = { version = "1.0.136", features = ["derive"] }

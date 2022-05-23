@@ -24,8 +24,8 @@ use tokio::{
 };
 
 use crate::{
-    utils::{create_informer, Event, ResyncNotification},
-    CONFIG, TMP_DIR,
+    utils::{create_informer, get_job_filename, Event, ResyncNotification},
+    BASE_IMG, CONFIG, GPU_SERVER_CONFIG, TMP_DIR,
 };
 
 pub struct GpuJobController {
@@ -152,25 +152,20 @@ impl GpuJobController {
 
     async fn create_pod_template(&self, job: &mut GpuJob) -> Result<()> {
         self.prepare_file(job).await?;
+        self.build_image(job).await?;
         Ok(())
     }
 
     async fn prepare_file(&self, job: &GpuJob) -> Result<()> {
         self.fetch_code(job).await?;
         self.gen_config_file(job).await?;
+        self.gen_docker_file(job).await?;
         Ok(())
     }
 
     async fn fetch_code(&self, job: &GpuJob) -> Result<()> {
         let client = reqwest::Client::new();
-        let job_status = job
-            .status
-            .as_ref()
-            .with_context(|| "GpuJob has no status")?;
-        let filename = job_status
-            .filename
-            .as_ref()
-            .with_context(|| "GpuJob has no code filname")?;
+        let filename = get_job_filename(job)?;
         let response = client
             .get(format!("{}/api/v1/tmp/{}", CONFIG.api_server_url, filename))
             .send()
@@ -216,7 +211,7 @@ impl GpuJobController {
         );
         content
             .push_str(format!("#SBATCH --cpus-per-task={}\n", slurm_config.cpus_per_task).as_str());
-        content.push_str(format!("#SBATCH --gres=gpu:{}\n", slurm_config.gres).as_str());
+        content.push_str(format!("#SBATCH --gres={}\n", slurm_config.gres).as_str());
         if let Some(scripts) = slurm_config.scripts {
             for script in scripts {
                 content.push_str(format!("{}\n", script).as_str());
@@ -225,7 +220,38 @@ impl GpuJobController {
 
         file.write_all(content.as_ref())?;
 
-        // file.write_all(content.as_ref())?;
+        Ok(())
+    }
+
+    async fn gen_docker_file(&self, job: &GpuJob) -> Result<()> {
+        let code_file_name = get_job_filename(job)?;
+        let job_dir_path = std::path::Path::new(TMP_DIR).join(PathBuf::from(job.name()));
+        let docker_file_path = job_dir_path.join("Dockerfile");
+        let mut docker_file = File::create(docker_file_path)?;
+        let mut content = format!("FROM {}\n", BASE_IMG);
+        content.push_str(format!("COPY . {}\n", "/code/").as_str());
+        content.push_str(
+            format!(
+                "ENV USERNAME={} PASSWORD={} JOB_NAME={}\n",
+                GPU_SERVER_CONFIG.username,
+                GPU_SERVER_CONFIG.password,
+                job.name()
+            )
+            .as_str(),
+        );
+        content.push_str(
+            format!(
+                "ENV CODE_FILE_NAME={} COMPILE_SCRIPT={}\n",
+                code_file_name, job.spec.gpu_config.compile_scripts
+            )
+            .as_str(),
+        );
+
+        docker_file.write_all(content.as_ref())?;
+        Ok(())
+    }
+
+    async fn build_image(&self, job: &GpuJob) -> Result<()> {
         Ok(())
     }
 

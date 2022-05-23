@@ -5,11 +5,19 @@ use anyhow::{Context, Result};
 use config::{Config, File};
 use controller::GpuJobController;
 use resources::config::ClusterConfig;
+use serde::{Deserialize, Serialize};
 
 mod controller;
 mod utils;
 
 const TMP_DIR: &str = "/tmp/minik8s/job";
+const BASE_IMG: &str = "minik8s.xyz/gpu_server:latest";
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ServerConfig {
+    pub username: String,
+    pub password: String,
+}
 
 lazy_static! {
     pub static ref CONFIG: ClusterConfig = Config::builder()
@@ -19,6 +27,13 @@ lazy_static! {
         .try_deserialize::<ClusterConfig>()
         .with_context(|| "Failed to parse config".to_string())
         .unwrap_or_default();
+    pub static ref GPU_SERVER_CONFIG: ServerConfig = Config::builder()
+        .add_source(File::with_name("/etc/rminik8s/gpuserver-config.yaml"))
+        .build()
+        .unwrap_or_default()
+        .try_deserialize::<ServerConfig>()
+        .with_context(|| "Failed to parse config".to_string())
+        .unwrap();
 }
 
 #[tokio::main]

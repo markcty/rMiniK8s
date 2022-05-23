@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Context, Error, Result};
 use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
     models::Response,
-    objects::Object,
+    objects::{gpu_job::GpuJob, Object},
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
@@ -89,4 +89,16 @@ pub fn create_informer<T: Object>(
     }));
 
     Informer::new(lw, eh, rh)
+}
+
+pub fn get_job_filename(job: &GpuJob) -> Result<String> {
+    let job_status = job
+        .status
+        .as_ref()
+        .with_context(|| "GpuJob has no status")?;
+    let filename = job_status
+        .filename
+        .as_ref()
+        .with_context(|| "GpuJob has no code filname")?;
+    Ok(filename.to_owned())
 }

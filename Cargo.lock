@@ -595,6 +595,7 @@ dependencies = [
  "parking_lot 0.12.0",
  "reqwest",
  "resources",
+ "serde",
  "tokio",
  "tokio-tungstenite",
  "tracing",
