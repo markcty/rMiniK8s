@@ -4,6 +4,7 @@ use crate::{etcd::EtcdClient, AppState};
 
 pub mod binding;
 pub mod function;
+pub mod gpu_job;
 pub mod hpa;
 pub mod ingress;
 pub mod metrics;

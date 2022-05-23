@@ -25,10 +25,6 @@ impl Object for GpuJob {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GpuJobSpec {
-    /// Describes the pod that will be created when executing a job.
-    pub template: Option<PodTemplateSpec>,
-    /// filename of code zip file
-    pub filename: Option<String>,
     /// GPU config of the GpuJob.
     pub gpu_config: GpuConfig,
     /// Specifies the desired number of successfully finished pods the job should be run with.
@@ -51,7 +47,7 @@ pub struct GpuJobSpec {
 #[serde(rename_all = "camelCase")]
 pub struct GpuConfig {
     pub slurm_config: SlurmConfig,
-    pub compile_scripts: Vec<String>,
+    pub compile_scripts: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -74,6 +70,10 @@ pub struct GpuJobStatus {
     pub failed: u32,
     /// The number of pods which reached phase Succeeded.
     pub succeeded: u32,
+    /// filename of code zip file
+    pub filename: Option<String>,
+    /// Describes the pod that will be created when executing a job.
+    pub template: Option<PodTemplateSpec>,
 }
 
 fn completions_default() -> u32 {
