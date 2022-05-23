@@ -42,17 +42,14 @@ pub async fn create(
                 );
             },
             "code" => {
-                if !field
-                    .file_name()
-                    .map_or("".to_string(), |n| n.to_owned())
-                    .ends_with(".zip")
-                {
+                let original_filename = field.file_name().map_or("".to_string(), |n| n.to_owned());
+                if !original_filename.ends_with(".zip") {
                     let err =
                         ErrResponse::bad_request("Please upload a zip file".to_string(), None);
                     return Err(err);
                 }
 
-                filename = Some(stream_to_tmp_file(name.as_str(), field).await?);
+                filename = Some(stream_to_tmp_file(original_filename.as_str(), field).await?);
             },
             _ => {},
         }
