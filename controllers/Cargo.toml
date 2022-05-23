@@ -22,6 +22,10 @@ path = "src/ingress/main.rs"
 name = "podautoscaler"
 path = "src/podautoscaler/main.rs"
 
+[[bin]]
+name = "gpujob-controller"
+path = "src/gpu_job/main.rs"
+
 [dependencies]
 chrono = "0.4.19"
 config = { version = "0.13.1", features = ["yaml"] }

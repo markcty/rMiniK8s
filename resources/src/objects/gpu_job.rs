@@ -53,7 +53,6 @@ pub struct GpuConfig {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SlurmConfig {
-    pub job_name: String,
     pub partition: String,
     pub total_core_number: u32,
     pub ntasks_per_node: u32,

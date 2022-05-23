@@ -5,7 +5,6 @@ metadata:
 spec:
   gpuConfig:
     slurmConfig:
-      jobName: cuda
       partition: dgx2
       totalCoreNumber: 1
       ntasksPerNode: 1

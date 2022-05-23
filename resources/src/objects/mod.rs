@@ -89,6 +89,14 @@ pub trait Object:
     fn uri(&self) -> String {
         format!("{}/{}", self.prefix(), self.name())
     }
+
+    /// Return an object reference to this object
+    fn object_reference(&self) -> ObjectReference {
+        ObjectReference {
+            name: self.name().to_owned(),
+            kind: self.kind().to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
