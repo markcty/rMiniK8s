@@ -5,6 +5,7 @@ use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
     objects::{
+        node::NodeAddressType,
         pod::{PodCondition, PodConditionType},
         KubeObject, Object,
     },
@@ -26,24 +27,48 @@ pub async fn bind(
 ) -> HandlerResult<()> {
     // check payload
     if let KubeObject::Binding(binding) = &payload {
+        // get node
+        let object = etcd_get_object(
+            &app_state,
+            format!("/api/v1/nodes/{}", binding.target.name),
+            Some("node"),
+        )
+        .await?;
+        let node = match object {
+            KubeObject::Node(node) => node,
+            _ => {
+                return Err(ErrResponse::new(
+                    String::from("bind error"),
+                    Some(format!(
+                        "Expecting bind target to be node kind, got {}",
+                        object.kind()
+                    )),
+                ));
+            },
+        };
+
         // get pod object
-        let mut object: KubeObject = etcd_get_object(&app_state, payload.uri(), None).await?;
+        let mut object: KubeObject = etcd_get_object(
+            &app_state,
+            format!("/api/v1/pods/{}", binding.metadata.name),
+            Some("pod"),
+        )
+        .await?;
         // update pod
         if let KubeObject::Pod(ref mut pod) = object {
-            let mut status = pod.status.clone().unwrap_or_default();
+            let mut status = &mut pod.status.as_mut().expect("Pod should have a status");
             status.conditions.insert(
                 PodConditionType::PodScheduled,
                 PodCondition {
                     status: true,
                 },
             );
-            // TODO: get the node, and get the address of that node, then set the host_ip according to that.
-            status.host_ip = Some("127.0.0.1".to_string());
-            pod.status = Some(status);
-
-            let mut spec = pod.spec.clone();
-            spec.node_name = Some(binding.target.name.clone());
-            pod.spec = spec;
+            status.host_ip = node
+                .status
+                .addresses
+                .get(&NodeAddressType::InternalIP)
+                .map(|addr| addr.to_owned());
+            pod.spec.node_name = Some(binding.target.name.clone());
         } else {
             tracing::error!("object kind error");
             return Err(ErrResponse::new(
