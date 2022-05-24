@@ -4,6 +4,7 @@ use std::{
     fs::{self, File},
     io::Write,
     path::PathBuf,
+    process::Command,
 };
 
 use anyhow::{anyhow, Context, Error, Result};
@@ -13,8 +14,8 @@ use resources::{
     objects::{
         gpu_job::{GpuJob, GpuJobStatus},
         object_reference::ObjectReference,
-        pod::{Pod, PodPhase},
-        KubeObject, Object,
+        pod::{Container, ImagePullPolicy, Pod, PodPhase, PodSpec, PodTemplateSpec, RestartPolicy},
+        KubeObject, Metadata, Object,
     },
 };
 use tokio::{
@@ -24,8 +25,8 @@ use tokio::{
 };
 
 use crate::{
-    utils::{create_informer, get_job_filename, Event, ResyncNotification},
-    BASE_IMG, CONFIG, GPU_SERVER_CONFIG, TMP_DIR,
+    utils::{create_informer, get_job_filename, get_job_status, Event, ResyncNotification},
+    BASE_IMG, CONFIG, DOCKER_REGISTRY, GPU_SERVER_CONFIG, TMP_DIR,
 };
 
 pub struct GpuJobController {
@@ -75,10 +76,8 @@ impl GpuJobController {
             select! {
                 Some(event) = self.job_rx.recv() => {
                     let result = match event {
-                        Event::Add(mut job) => {
-                            self.create_pod_template(&mut job).await?;
-                            self.reconcile(job).await
-                        }
+                        Event::Add(mut job) => self.create_pod_template(&mut job).await,
+
                         Event::Update(_, job) => self.reconcile(job).await,
                         Event::Delete(mut job) => {
                                 // FIXME: Remove all pods instead of one
@@ -145,14 +144,38 @@ impl GpuJobController {
                 new_status.succeeded
             );
             job.status = Some(new_status);
-            self.post_status(job).await?;
+            self.post_status(&job).await?;
         }
         Ok(())
     }
 
     async fn create_pod_template(&self, job: &mut GpuJob) -> Result<()> {
         self.prepare_file(job).await?;
-        self.build_image(job).await?;
+        let image_name = self.build_image(job).await?;
+        let pod_template = PodTemplateSpec {
+            metadata: Metadata {
+                name: job.name().to_owned(),
+                owner_references: vec![job.object_reference()],
+                ..Default::default()
+            },
+            spec: PodSpec {
+                containers: vec![Container {
+                    name: job.name().to_owned(),
+                    image: image_name,
+                    image_pull_policy: Some(ImagePullPolicy::IfNotPresent),
+                    ..Default::default()
+                }],
+                restart_policy: RestartPolicy::Never,
+                ..Default::default()
+            },
+        };
+
+        let mut job_status = get_job_status(job)?;
+        job_status.template = Some(pod_template);
+        job.status = Some(job_status);
+
+        self.post_status(job).await?;
+
         Ok(())
     }
 
@@ -179,9 +202,9 @@ impl GpuJobController {
             ));
         }
 
-        let job_dir_path = std::path::Path::new(TMP_DIR).join(PathBuf::from(job.name()));
+        let job_dir_path = std::path::Path::new(TMP_DIR).join(job.name());
         fs::create_dir_all(&job_dir_path)?;
-        let code_path = job_dir_path.join(PathBuf::from(filename));
+        let code_path = job_dir_path.join(filename);
         let mut file = File::create(code_path)?;
         let content = response.bytes().await?;
         file.write_all(content.as_ref())?;
@@ -190,7 +213,7 @@ impl GpuJobController {
     }
 
     async fn gen_config_file(&self, job: &GpuJob) -> Result<()> {
-        let job_dir_path = std::path::Path::new(TMP_DIR).join(PathBuf::from(job.name()));
+        let job_dir_path = std::path::Path::new(TMP_DIR).join(job.name());
         fs::create_dir_all(&job_dir_path)?;
         let config_path = job_dir_path.join(PathBuf::from(format!("{}.slurm", job.name())));
         let mut file = File::create(config_path)?;
@@ -225,7 +248,7 @@ impl GpuJobController {
 
     async fn gen_docker_file(&self, job: &GpuJob) -> Result<()> {
         let code_file_name = get_job_filename(job)?;
-        let job_dir_path = std::path::Path::new(TMP_DIR).join(PathBuf::from(job.name()));
+        let job_dir_path = std::path::Path::new(TMP_DIR).join(job.name());
         let docker_file_path = job_dir_path.join("Dockerfile");
         let mut docker_file = File::create(docker_file_path)?;
         let mut content = format!("FROM {}\n", BASE_IMG);
@@ -251,8 +274,19 @@ impl GpuJobController {
         Ok(())
     }
 
-    async fn build_image(&self, job: &GpuJob) -> Result<()> {
-        Ok(())
+    async fn build_image(&self, job: &GpuJob) -> Result<String> {
+        let tag = format!("{}/{}", DOCKER_REGISTRY, job.name());
+        tracing::info!("building image: {}", tag);
+        let job_dir_path = std::path::Path::new(TMP_DIR).join(job.name());
+        Command::new("docker")
+            .current_dir(&job_dir_path)
+            .args(["build", "-t", tag.as_str(), "."])
+            .output()?;
+        Command::new("docker")
+            .current_dir(&job_dir_path)
+            .args(["push", tag.as_str()])
+            .output()?;
+        Ok(tag)
     }
 
     async fn reconcile(&self, job: GpuJob) -> Result<()> {
@@ -283,12 +317,12 @@ impl GpuJobController {
         Ok(())
     }
 
-    async fn post_status(&self, job: GpuJob) -> Result<()> {
+    async fn post_status(&self, job: &GpuJob) -> Result<()> {
         let client = reqwest::Client::new();
         let name = job.metadata.name.to_owned();
         let response = client
             .put(format!("{}{}", CONFIG.api_server_url, job.uri()))
-            .json(&KubeObject::GpuJob(job))
+            .json(&KubeObject::GpuJob(job.to_owned()))
             .send()
             .await?
             .json::<Response<()>>()
@@ -304,16 +338,12 @@ impl GpuJobController {
 
     async fn create_pod(&self, job: &GpuJob) -> Result<()> {
         let client = reqwest::Client::new();
-        let job_status = job
-            .status
-            .as_ref()
-            .with_context(|| "GpuJob has no status")?;
+        let job_status = get_job_status(job)?;
         let template = job_status
             .template
             .as_ref()
             .with_context(|| "GpuJob has no pod template")?;
-        let mut metadata = template.metadata.clone();
-        metadata.owner_references.push(job.object_reference());
+        let metadata = template.metadata.clone();
         let pod = Pod {
             metadata,
             spec: template.spec.clone(),

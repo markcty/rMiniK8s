@@ -3,7 +3,10 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
     models::Response,
-    objects::{gpu_job::GpuJob, Object},
+    objects::{
+        gpu_job::{GpuJob, GpuJobStatus},
+        Object,
+    },
 };
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
@@ -89,6 +92,14 @@ pub fn create_informer<T: Object>(
     }));
 
     Informer::new(lw, eh, rh)
+}
+
+pub fn get_job_status(job: &GpuJob) -> Result<GpuJobStatus> {
+    let job_status = job
+        .status
+        .as_ref()
+        .with_context(|| "GpuJob has no status")?;
+    Ok(job_status.to_owned())
 }
 
 pub fn get_job_filename(job: &GpuJob) -> Result<String> {

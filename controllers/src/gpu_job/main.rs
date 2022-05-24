@@ -11,6 +11,7 @@ mod controller;
 mod utils;
 
 const TMP_DIR: &str = "/tmp/minik8s/job";
+const DOCKER_REGISTRY: &str = "minik8s.xyz";
 const BASE_IMG: &str = "minik8s.xyz/gpu_server:latest";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
