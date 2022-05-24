@@ -2005,6 +2005,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mime",
+ "mime_guess",
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
@@ -2080,6 +2081,7 @@ dependencies = [
  "reqwest",
  "resources",
  "serde",
+ "serde_json",
  "serde_yaml",
  "strum",
 ]
