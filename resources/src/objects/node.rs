@@ -1,11 +1,13 @@
 use std::{collections::HashMap, fmt::Write};
 
-use chrono::{Local, NaiveDateTime, TimeZone};
+use chrono::{Duration, Local, NaiveDateTime, TimeZone};
+use derivative::Derivative;
 use indenter::indented;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
 use super::{Metadata, Object};
+use crate::config::kubelet::KubeletConfig;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Node {
@@ -60,7 +62,21 @@ impl std::fmt::Display for Node {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+impl Node {
+    pub fn is_ready(&self) -> bool {
+        let now = Local::now().naive_utc();
+        let config = KubeletConfig::default();
+        self.status.last_heartbeat
+            > now
+                - (Duration::seconds(
+                    config.node_status_report_frequency as i64
+                        + config.node_status_update_frequency as i64,
+                ))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Derivative, Eq)]
+#[derivative(PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeStatus {
     /// List of addresses reachable to the node.
@@ -76,6 +92,7 @@ pub struct NodeStatus {
     /// Set of ids/uuids to uniquely identify the node.
     pub node_info: NodeInfo,
     /// Last heartbeat time, set by rKubelet.
+    #[derivative(PartialEq = "ignore")]
     pub last_heartbeat: NaiveDateTime,
 }
 

@@ -30,7 +30,7 @@ impl Default for KubeletConfig {
         KubeletConfig {
             static_pod_path: "/etc/rminik8s/manifests".to_string(),
             node_status_update_frequency: 10,
-            node_status_report_frequency: 300,
+            node_status_report_frequency: 30,
             pod_status_update_frequency: 10,
             cluster: ClusterConfig::default(),
             port: 10250,

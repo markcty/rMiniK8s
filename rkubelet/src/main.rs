@@ -39,6 +39,7 @@ pub struct AppState {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("rKubelet started");
+    tracing::debug!("API Server: {}", CONFIG.cluster.api_server_url);
 
     let lw = ListerWatcher {
         lister: Box::new(move |_| {

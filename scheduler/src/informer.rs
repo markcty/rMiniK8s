@@ -3,17 +3,33 @@ use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store, WsStream},
     models,
-    objects::{node::Node, pod::Pod, Object},
+    objects::{node::Node, pod::Pod},
 };
 use tokio::{
-    sync::mpsc::{self, Receiver},
+    sync::mpsc::{self, Receiver, Sender},
     task::JoinHandle,
 };
 use tokio_tungstenite::connect_async;
 
-pub type RunInformerResult<T> = (Receiver<T>, Store<T>, JoinHandle<Result<(), Error>>);
+use crate::{NodeUpdate, PodUpdate};
 
-pub fn run_pod_informer() -> RunInformerResult<Pod> {
+pub type RunInformerResult<T, E> = (
+    Sender<E>,
+    Receiver<E>,
+    Store<T>,
+    JoinHandle<Result<(), Error>>,
+);
+
+#[derive(Debug)]
+pub enum ResyncNotification {
+    /// Enqueue all pods in store
+    EnqueuePods,
+    RefreshCache,
+}
+
+pub fn run_pod_informer(
+    resync_tx: Sender<ResyncNotification>,
+) -> RunInformerResult<Pod, PodUpdate> {
     // create list watcher closures
     // TODO: maybe some crate or macros can simplify the tedious boxed closure creation in heap
     let lw = ListerWatcher::<Pod> {
@@ -37,35 +53,41 @@ pub fn run_pod_informer() -> RunInformerResult<Pod> {
     };
 
     // create event handler closures
-    let (tx_add, rx) = mpsc::channel::<Pod>(16);
+    let (tx, rx) = mpsc::channel::<PodUpdate>(16);
+    let tx_add = tx.clone();
+    let tx_update = tx.clone();
+    let tx_delete = tx.clone();
     let eh = EventHandler::<Pod> {
         add_cls: Box::new(move |pod| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
             let tx_add = tx_add.clone();
             Box::pin(async move {
-                tracing::debug!("add\n{}", pod.name());
-                tx_add.send(pod).await?;
+                tx_add.send(PodUpdate::Add(pod)).await?;
                 Ok(())
             })
         }),
         update_cls: Box::new(move |(old, new)| {
+            let tx_update = tx_update.clone();
             Box::pin(async move {
-                tracing::debug!("update\n{}\n{}", old.name(), new.name());
+                tx_update.send(PodUpdate::Update(old, new)).await?;
                 Ok(())
             })
         }),
-        delete_cls: Box::new(move |old| {
+        delete_cls: Box::new(move |pod| {
+            let tx_delete = tx_delete.clone();
             Box::pin(async move {
-                tracing::debug!("delete\n{}", old.name());
+                tx_delete.send(PodUpdate::Delete(pod)).await?;
                 Ok(())
             })
         }),
     };
 
-    // TODO: fill real logic
     let rh = ResyncHandler(Box::new(move |_| {
+        let resync_tx = resync_tx.clone();
         Box::pin(async move {
-            tracing::debug!("Resync\n");
+            // enqueue all pods
+            tracing::debug!("Resyncing pods...");
+            resync_tx.send(ResyncNotification::EnqueuePods).await?;
             Ok(())
         })
     }));
@@ -74,10 +96,12 @@ pub fn run_pod_informer() -> RunInformerResult<Pod> {
     let store = informer.get_store();
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
-    (rx, store, informer_handler)
+    (tx, rx, store, informer_handler)
 }
 
-pub fn run_node_informer() -> RunInformerResult<Node> {
+pub fn run_node_informer(
+    resync_tx: Sender<ResyncNotification>,
+) -> RunInformerResult<Node, NodeUpdate> {
     // create list watcher closures
     // TODO: maybe some crate or macros can simplify the tedious boxed closure creation in heap
     let lw = ListerWatcher::<Node> {
@@ -101,33 +125,40 @@ pub fn run_node_informer() -> RunInformerResult<Node> {
     };
 
     // create event handler closures
-    let (_, rx) = mpsc::channel::<Node>(16);
+    let (tx, rx) = mpsc::channel::<NodeUpdate>(16);
+    let tx_add = tx.clone();
+    let tx_update = tx_add.clone();
+    let tx_delete = tx_add.clone();
     let eh = EventHandler::<Node> {
         add_cls: Box::new(move |node| {
             // TODO: this is not good: tx is copied every time add_cls is called, but I can't find a better way
+            let tx_add = tx_add.clone();
             Box::pin(async move {
-                tracing::debug!("add\n{}", node.name());
+                tx_add.send(NodeUpdate::Add(node)).await?;
                 Ok(())
             })
         }),
         update_cls: Box::new(move |(old, new)| {
+            let tx_update = tx_update.clone();
             Box::pin(async move {
-                tracing::debug!("update\n{}\n{}", old.name(), new.name());
+                tx_update.send(NodeUpdate::Update(old, new)).await?;
                 Ok(())
             })
         }),
-        delete_cls: Box::new(move |old| {
+        delete_cls: Box::new(move |node| {
+            let tx_delete = tx_delete.clone();
             Box::pin(async move {
-                tracing::debug!("delete\n{}", old.name());
+                tx_delete.send(NodeUpdate::Delete(node)).await?;
                 Ok(())
             })
         }),
     };
 
-    // TODO: fill real logic
     let rh = ResyncHandler(Box::new(move |_| {
+        let resync_tx = resync_tx.clone();
         Box::pin(async move {
-            tracing::debug!("Resync\n");
+            tracing::debug!("Resyncing nodes...");
+            resync_tx.send(ResyncNotification::RefreshCache).await?;
             Ok(())
         })
     }));
@@ -136,5 +167,5 @@ pub fn run_node_informer() -> RunInformerResult<Node> {
     let store = informer.get_store();
     let informer_handler = tokio::spawn(async move { informer.run().await });
 
-    (rx, store, informer_handler)
+    (tx, rx, store, informer_handler)
 }
