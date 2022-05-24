@@ -63,6 +63,13 @@ pub async fn replace(
     Path(pod_name): Path<String>,
     Json(payload): Json<KubeObject>,
 ) -> HandlerResult<()> {
+    // Ensure object exists, otherwise deleted object will be created
+    etcd_get_object(
+        &app_state,
+        format!("/api/v1/pods/{}", pod_name),
+        Some("pod"),
+    )
+    .await?;
     if let KubeObject::Pod(_) = payload {
         etcd_put(&app_state, &payload).await?;
         let res = Response::new(Some(format!("pod/{} replaced", pod_name)), None);
