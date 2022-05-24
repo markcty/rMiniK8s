@@ -8,6 +8,7 @@ use tokio::{
 use crate::{models::PodUpdate, pod::Pod, PodList, ResyncNotification};
 
 pub struct PodWorker {
+    node_name: String,
     pods: PodList,
     pod_store: Store<pod::Pod>,
     work_queue_tx: Sender<PodUpdate>,
@@ -16,12 +17,14 @@ pub struct PodWorker {
 
 impl PodWorker {
     pub fn new(
+        node_name: String,
         pods: PodList,
         pod_store: Store<pod::Pod>,
         work_queue_tx: Sender<PodUpdate>,
         resync_rx: Receiver<ResyncNotification>,
     ) -> Self {
         Self {
+            node_name,
             pods,
             pod_store,
             work_queue_tx,
@@ -44,7 +47,7 @@ impl PodWorker {
     async fn handle_update(&mut self, update: PodUpdate) {
         match update {
             PodUpdate::Add(pod) => self.handle_pod_add(pod).await,
-            PodUpdate::Update(pod) => self.handle_pod_update(pod).await,
+            PodUpdate::Update(old_pod, new_pod) => self.handle_pod_update(old_pod, new_pod).await,
             PodUpdate::Delete(pod) => self.handle_pod_delete(pod).await,
         }
     }
@@ -53,12 +56,15 @@ impl PodWorker {
         tracing::info!("Start resync...");
         let store = self.pod_store.read().await;
         let mut pods = self.pods.write().await;
-        for (_, pod) in store.iter() {
+        for (_, pod) in store
+            .iter()
+            .filter(|(_, pod)| pod.is_on_node(&self.node_name))
+        {
             let name = &pod.metadata.name;
             pods.insert(name.to_owned());
             let result = self
                 .work_queue_tx
-                .send(PodUpdate::Update(pod.clone()))
+                .send(PodUpdate::Update(pod.clone(), pod.clone()))
                 .await;
             if let Err(err) = result {
                 tracing::error!(
@@ -74,6 +80,10 @@ impl PodWorker {
     }
 
     async fn handle_pod_add(&mut self, pod: pod::Pod) {
+        if !pod.is_on_node(&self.node_name) {
+            return;
+        }
+
         let name = pod.metadata.name.to_owned();
         tracing::info!("Pod added: {}", name);
         let res = Pod::create(pod).await;
@@ -97,7 +107,14 @@ impl PodWorker {
         store.insert(name);
     }
 
-    async fn handle_pod_update(&mut self, pod: pod::Pod) {
+    async fn handle_pod_update(&mut self, old_pod: pod::Pod, pod: pod::Pod) {
+        // Pod may be newly scheduled to this node
+        if !old_pod.is_on_node(&self.node_name) && pod.is_on_node(&self.node_name) {
+            tracing::info!("Pod {} is scheduled to this node", pod.metadata.name);
+            self.handle_pod_add(pod).await;
+            return;
+        }
+
         let pods = self.pods.read().await;
         let name = pod.metadata.name.to_owned();
         // Pod is not in list, maybe it's being reconciled
@@ -136,6 +153,10 @@ impl PodWorker {
     }
 
     async fn handle_pod_delete(&mut self, pod: pod::Pod) {
+        if !pod.is_on_node(&self.node_name) {
+            return;
+        }
+
         let name = pod.metadata.name.to_owned();
         tracing::info!("Pod deleted: {}", name);
         let mut store = self.pods.write().await;

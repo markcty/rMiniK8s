@@ -204,4 +204,8 @@ impl NodeStatusManager {
             .await?;
         Ok(())
     }
+
+    pub fn node_name(&self) -> String {
+        self.metadata.name.clone()
+    }
 }

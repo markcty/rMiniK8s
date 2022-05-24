@@ -53,6 +53,13 @@ impl Pod {
         }
     }
 
+    pub fn is_on_node(&self, node_name: &str) -> bool {
+        self.spec
+            .node_name
+            .as_ref()
+            .map_or(false, |name| name == node_name)
+    }
+
     pub fn requests(&self, resource: &metrics::Resource) -> i64 {
         self.spec
             .containers

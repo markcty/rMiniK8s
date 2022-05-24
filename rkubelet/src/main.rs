@@ -77,10 +77,10 @@ async fn main() -> Result<()> {
                 Ok(())
             })
         }),
-        update_cls: Box::new(move |(_old_pod, new_pod)| {
+        update_cls: Box::new(move |(old_pod, new_pod)| {
             let tx_update = tx_update.clone();
             Box::pin(async move {
-                let message = PodUpdate::Update(new_pod);
+                let message = PodUpdate::Update(old_pod, new_pod);
                 tx_update.send(message).await?;
                 Ok(())
             })
@@ -108,16 +108,17 @@ async fn main() -> Result<()> {
     let pod_store = informer.get_store();
     let informer_handle = tokio::spawn(async move { informer.run().await });
 
+    let mut node_status_manager = NodeStatusManager::new();
+    let node_name = node_status_manager.node_name();
+    let node_status_manager_handle = tokio::spawn(async move { node_status_manager.run().await });
+
     let pods: PodList = Arc::new(RwLock::new(HashSet::new()));
     // Start pod worker
-    let mut pod_worker = PodWorker::new(pods.clone(), pod_store.clone(), tx, resync_rx);
+    let mut pod_worker = PodWorker::new(node_name, pods.clone(), pod_store.clone(), tx, resync_rx);
     let pod_worker_handle = tokio::spawn(async move { pod_worker.run(rx).await });
 
     let mut status_manager = StatusManager::new(pods, pod_store.clone());
     let status_manager_handle = tokio::spawn(async move { status_manager.run().await });
-
-    let mut node_status_manager = NodeStatusManager::new();
-    let node_status_manager_handle = tokio::spawn(async move { node_status_manager.run().await });
 
     // Configure and start rkubelet API server
     let app_state = Arc::new(AppState {
