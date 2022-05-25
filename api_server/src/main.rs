@@ -8,7 +8,7 @@ use axum::{
 };
 use config::Config;
 use dashmap::DashSet;
-use etcd::EtcdConfig;
+use etcd::create_etcd_pool;
 use serde::Deserialize;
 use tokio::fs;
 use tower_http::services::ServeDir;
@@ -20,9 +20,13 @@ const TMP_DIR: &str = "/tmp/minik8s";
 
 #[derive(Debug, Clone, Deserialize)]
 struct ServerConfig {
+    #[serde(default = "default_log_level")]
     log_level: String,
-    etcd: EtcdConfig,
+    etcd_endpoint: String,
     metrics_server: String,
+}
+fn default_log_level() -> String {
+    "Info".to_string()
 }
 
 pub struct AppState {
@@ -35,7 +39,8 @@ pub struct AppState {
 async fn main() -> Result<()> {
     // read config
     let config = Config::builder()
-        .add_source(config::File::with_name("/etc/minik8s/api_server.yaml"))
+        .add_source(config::File::with_name("/etc/rminik8s/api_server.yaml").required(false))
+        .add_source(config::Environment::default())
         .build()?
         .try_deserialize::<ServerConfig>()
         .with_context(|| "Failed to parse config".to_string())?;
@@ -45,7 +50,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     // init app state
-    let app_state = AppState::from_config(&config).await?;
+    let app_state = AppState::from_config(&config)?;
     let shared_state = Arc::new(app_state);
 
     #[rustfmt::skip]
@@ -204,17 +209,14 @@ async fn main() -> Result<()> {
 }
 
 impl AppState {
-    async fn from_config(config: &ServerConfig) -> Result<AppState> {
-        let pool = config
-            .etcd
-            .create_pool()
-            .await
+    fn from_config(config: &ServerConfig) -> Result<AppState> {
+        let pool = create_etcd_pool(config.etcd_endpoint.as_str())
             .with_context(|| "Failed to create etcd client pool".to_string())?;
 
         Ok(AppState {
             etcd_pool: pool,
             service_ip_pool: DashSet::new(),
-            config: (*config).to_owned(),
+            config: config.to_owned(),
         })
     }
 }
