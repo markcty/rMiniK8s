@@ -5,7 +5,9 @@ use clap::Args;
 use reqwest::blocking::Client;
 use resources::{
     models::Response,
-    objects::KubeObject::{self, HorizontalPodAutoscaler, Ingress, Pod, ReplicaSet, Service},
+    objects::KubeObject::{
+        self, GpuJob, HorizontalPodAutoscaler, Ingress, Pod, ReplicaSet, Service,
+    },
 };
 
 use crate::{
@@ -164,6 +166,25 @@ impl Arg {
                             status.current_replicas,
                             status.desired_replicas,
                             last_scale
+                        );
+                    }
+                }
+            },
+            ResourceKind::GpuJobs => {
+                println!(
+                    "{:<20} {:<10} {:<8} {:<8} {:<8}",
+                    "NAME", "DESIRED", "ACTIVE", "FAILED", "SUCCEEDED"
+                );
+                for object in data {
+                    if let GpuJob(job) = object {
+                        let status = job.status.unwrap_or_default();
+                        println!(
+                            "{:<20} {:<10} {:<8} {:<8} {:<8}",
+                            job.metadata.name,
+                            job.spec.completions,
+                            status.active,
+                            status.failed,
+                            status.succeeded
                         );
                     }
                 }
