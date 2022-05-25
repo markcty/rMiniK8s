@@ -11,12 +11,14 @@ use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::connect_async;
 
 use crate::{
-    config::CONFIG, models::PodUpdate, pod_worker::PodWorker, status_manager::StatusManager,
+    config::CONFIG, models::PodUpdate, node_status_manager::NodeStatusManager,
+    pod_worker::PodWorker, status_manager::StatusManager,
 };
 
 mod config;
 mod docker;
 mod models;
+mod node_status_manager;
 mod pod;
 mod pod_worker;
 mod status_manager;
@@ -108,8 +110,12 @@ async fn main() -> Result<()> {
     let mut status_manager = StatusManager::new(pods, pod_store);
     let status_manager_handle = tokio::spawn(async move { status_manager.run().await });
 
-    status_manager_handle.await?.expect("Status manager failed");
-    pod_worker_handle.await?.expect("Pod worker failed");
+    let mut node_status_manager = NodeStatusManager::new();
+    let node_status_manager_handle = tokio::spawn(async move { node_status_manager.run().await });
+
+    node_status_manager_handle.await??;
+    status_manager_handle.await??;
+    pod_worker_handle.await??;
     informer_handle.await?
     // TODO: Gracefully shutdown
 }

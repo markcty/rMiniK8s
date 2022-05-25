@@ -146,6 +146,18 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
+    let node_routes = Router::new().nest(
+        "/nodes",
+        Router::new()
+            .route("/", get(handler::node::list))
+            .route("/:name",
+                   get(handler::node::get)
+                       .put(handler::node::update)
+                       .delete(handler::node::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
     let watch_routes = Router::new().nest(
         "/watch",
         Router::new()
@@ -185,10 +197,10 @@ async fn main() -> Result<()> {
                 .merge(hpa_routes)
                 .merge(watch_routes)
                 .merge(metrics_routes)
+                .merge(node_routes)
                 .merge(func_routes)
                 .merge(gpujob_routes)
                 .nest("/tmp", tmp_file_service)
-                .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),
         )
         .layer(Extension(shared_state));

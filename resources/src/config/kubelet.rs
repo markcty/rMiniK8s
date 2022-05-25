@@ -22,6 +22,7 @@ pub struct KubeletConfig {
     /// In seconds. Default: 10 sec
     pub pod_status_update_frequency: u64,
     pub cluster: ClusterConfig,
+    pub port: u16,
 }
 
 impl Default for KubeletConfig {
@@ -32,6 +33,7 @@ impl Default for KubeletConfig {
             node_status_report_frequency: 300,
             pod_status_update_frequency: 10,
             cluster: ClusterConfig::default(),
+            port: 10250,
         }
     }
 }
