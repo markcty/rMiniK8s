@@ -11,6 +11,7 @@ use strum::Display;
 
 mod create;
 mod delete;
+mod describe;
 mod get;
 mod patch;
 mod utils;
@@ -46,6 +47,8 @@ enum Commands {
     Get(get::Arg),
     /// Patch a resource
     Patch(patch::Arg),
+    /// Describe a resource,
+    Describe(describe::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -68,6 +71,7 @@ fn main() -> Result<()> {
         Commands::Delete(arg) => arg.handle()?,
         Commands::Get(arg) => arg.handle()?,
         Commands::Patch(arg) => arg.handle()?,
+        Commands::Describe(arg) => arg.handle()?,
     }
 
     Ok(())

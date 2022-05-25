@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt::Debug};
 use anyhow::{Context, Result};
 use enum_dispatch::enum_dispatch;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use strum::Display;
 use uuid::Uuid;
 
 use self::object_reference::ObjectReference;
@@ -19,7 +18,7 @@ pub mod pod;
 pub mod replica_set;
 pub mod service;
 
-#[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[enum_dispatch(Object)]
 #[serde(tag = "kind")]
 pub enum KubeObject {

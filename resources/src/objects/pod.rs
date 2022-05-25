@@ -1,7 +1,9 @@
+use core::fmt::Write;
 use std::{collections::HashMap, default::Default, net::Ipv4Addr};
 
 use bollard::models::{ContainerInspectResponse, ContainerStateStatusEnum, RestartPolicyNameEnum};
-use chrono::{Local, NaiveDateTime};
+use chrono::{Local, NaiveDateTime, TimeZone};
+use indenter::indented;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
@@ -49,6 +51,83 @@ impl Pod {
             .iter()
             .map(|container| container.requests(resource))
             .sum()
+    }
+
+    /// Get a vector of container pairs
+    /// (tuple of container spec and container status).
+    pub fn container_pairs(&self) -> Vec<ContainerPair> {
+        let mut pairs = vec![];
+        let statuses = self
+            .status
+            .as_ref()
+            .map_or(vec![], |status| status.container_statuses.clone());
+        for container in &self.spec.containers {
+            let status = statuses.iter().find(|status| status.name == container.name);
+            pairs.push(ContainerPair(container.clone(), status.cloned()));
+        }
+        pairs
+    }
+}
+
+impl std::fmt::Display for Pod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{:<16} {}", "Name:", self.metadata.name)?;
+        if self.status.is_none() {
+            return Ok(());
+        }
+        let status = self.status.as_ref().unwrap();
+        writeln!(
+            f,
+            "{:<16} {}/{}",
+            "Node:",
+            self.spec
+                .node_name
+                .as_ref()
+                .unwrap_or(&String::from("<none>")),
+            status.host_ip.as_ref().unwrap_or(&String::from("<none>"))
+        )?;
+        writeln!(
+            f,
+            "{:<16} {}",
+            "Start Time:",
+            Local.from_utc_datetime(&status.start_time)
+        )?;
+        writeln!(f, "{:<16} {}", "Labels:", self.metadata.labels.to_string())?;
+        writeln!(f, "{:<16} {}", "Phase:", status.phase)?;
+        writeln!(
+            f,
+            "{:<16} {}",
+            "IP:",
+            status
+                .pod_ip
+                .as_ref()
+                .map_or("<none>".to_string(), |ip| ip.to_string())
+        )?;
+
+        writeln!(f, "Containers:")?;
+        for pair in self.container_pairs() {
+            writeln!(f, "  {}:", pair.0.name)?;
+            write!(indented(f), "{}", pair)?;
+        }
+
+        writeln!(f, "Conditions:")?;
+        writeln!(indented(f), "{:<16} {:<8}", "Type", "Status")?;
+        for (condition_type, condition) in status.conditions.iter() {
+            writeln!(
+                indented(f),
+                "{:<16} {:<8}",
+                condition_type,
+                condition.status
+            )?;
+        }
+
+        if !self.spec.volumes.is_empty() {
+            writeln!(f, "Volumes:")?;
+            for volume in &self.spec.volumes {
+                writeln!(indented(f), "{}", volume)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -206,6 +285,12 @@ pub struct VolumeMount {
     pub name: String,
 }
 
+impl std::fmt::Display for VolumeMount {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} from {}", self.mount_path, self.name)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct ResourceRequirements {
     /// Limits describes the maximum amount of compute resources allowed.
@@ -215,6 +300,15 @@ pub struct ResourceRequirements {
     /// it defaults to Limits if that is explicitly specified,
     /// otherwise to an implementation-defined value.
     pub requests: Resource,
+}
+
+impl std::fmt::Display for ResourceRequirements {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "  Requests:")?;
+        write!(indented(f), "{}", self.requests)?;
+        writeln!(f, "  Limits:")?;
+        write!(indented(f), "{}", self.limits)
+    }
 }
 
 impl ResourceRequirements {
@@ -249,6 +343,13 @@ pub struct Resource {
     pub memory: i64,
 }
 
+impl std::fmt::Display for Resource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "{:<8} {}", "CPU:", self.cpu)?;
+        writeln!(f, "{:<8} {}", "Memory:", self.memory)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Volume {
     /// Volume's name.
@@ -258,7 +359,13 @@ pub struct Volume {
     pub config: VolumeConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+impl std::fmt::Display for Volume {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "{:<16}: {}", self.name, self.config)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum VolumeConfig {
     /// HostPath represents a pre-existing file
@@ -366,7 +473,7 @@ pub enum PodPhase {
     Succeeded,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, EnumIter, Clone)]
+#[derive(Debug, Serialize, Deserialize, Display, PartialEq, Eq, Hash, EnumIter, Clone)]
 pub enum PodConditionType {
     /// All containers in the pod are ready.
     ContainersReady,
@@ -386,7 +493,7 @@ pub struct PodCondition {
     pub status: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Display, Clone, Eq, PartialEq)]
 pub enum ContainerState {
     Running,
     Terminated { exit_code: i64 },
@@ -464,4 +571,37 @@ pub struct PodTemplateSpec {
     pub metadata: Metadata,
     /// Specification of the desired behavior of the pod.
     pub spec: PodSpec,
+}
+
+pub struct ContainerPair(Container, Option<ContainerStatus>);
+
+impl std::fmt::Display for ContainerPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (container, status) = (&self.0, &self.1);
+        writeln!(f, "{:<16} {}", "Image:", container.image)?;
+        writeln!(
+            f,
+            "{:<16} {}",
+            "Port:",
+            container
+                .ports
+                .iter()
+                .map(|port| port.container_port.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )?;
+        if let Some(status) = status {
+            writeln!(f, "{:<16} {}", "Container ID:", status.container_id)?;
+            writeln!(f, "{:<16} {}", "State:", status.state)?;
+            writeln!(f, "{:<16} {}", "Restart Count:", status.restart_count)?;
+        }
+        if !container.volume_mounts.is_empty() {
+            writeln!(f, "Mounts")?;
+            for volume_mount in &container.volume_mounts {
+                writeln!(indented(f), "{}", volume_mount)?;
+            }
+        }
+        writeln!(f, "Resources:")?;
+        write!(f, "{}", container.resources)
+    }
 }
