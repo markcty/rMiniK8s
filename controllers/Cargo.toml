@@ -22,6 +22,10 @@ path = "src/ingress/main.rs"
 name = "podautoscaler"
 path = "src/podautoscaler/main.rs"
 
+[[bin]]
+name = "gpujob-controller"
+path = "src/gpu_job/main.rs"
+
 [dependencies]
 chrono = "0.4.19"
 config = { version = "0.13.1", features = ["yaml"] }
@@ -38,3 +42,4 @@ tracing-subscriber = "0.3.10"
 lazy_static = "1.4.0"
 dotenv = "0.15.0"
 nginx-config = "0.13.2"
+serde = { version = "1.0.136", features = ["derive"] }

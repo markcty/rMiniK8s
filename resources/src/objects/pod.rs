@@ -35,6 +35,14 @@ impl Pod {
         }
     }
 
+    pub fn is_active(&self) -> bool {
+        if let Some(status) = &self.status {
+            matches!(status.phase, PodPhase::Pending | PodPhase::Running)
+        } else {
+            false
+        }
+    }
+
     pub fn requests(&self, resource: &metrics::Resource) -> i64 {
         self.spec
             .containers

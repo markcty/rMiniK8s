@@ -9,6 +9,7 @@ use uuid::Uuid;
 use self::object_reference::ObjectReference;
 
 pub mod binding;
+pub mod gpu_job;
 pub mod hpa;
 pub mod ingress;
 pub mod metrics;
@@ -29,6 +30,7 @@ pub enum KubeObject {
     ReplicaSet(replica_set::ReplicaSet),
     Ingress(ingress::Ingress),
     HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
+    GpuJob(gpu_job::GpuJob),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -86,6 +88,14 @@ pub trait Object:
     /// e.g. Pod "nginx" -> "/api/v1/pods/nginx"
     fn uri(&self) -> String {
         format!("{}/{}", self.prefix(), self.name())
+    }
+
+    /// Return an object reference to this object
+    fn object_reference(&self) -> ObjectReference {
+        ObjectReference {
+            name: self.name().to_owned(),
+            kind: self.kind().to_owned(),
+        }
     }
 }
 

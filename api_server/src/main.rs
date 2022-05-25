@@ -128,6 +128,24 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
+    let gpujob_routes = Router::new().nest(
+        "/gpujobs",
+        Router::new()
+            .route(
+                "/",
+                get(handler::gpu_job::list)
+                .post(handler::gpu_job::create),
+            )
+            .route(
+                "/:name",
+                get(handler::gpu_job::get)
+                    .put(handler::gpu_job::update)
+                    .patch(handler::gpu_job::patch)
+                    .delete(handler::gpu_job::delete),
+            ),
+    );
+
+    #[rustfmt::skip]
     let watch_routes = Router::new().nest(
         "/watch",
         Router::new()
@@ -136,7 +154,8 @@ async fn main() -> Result<()> {
             .route("/replicasets", get(handler::replica_set::watch_all))
             .route("/services", get(handler::service::watch_all))
             .route("/ingresses",get(handler::ingress::watch_all))
-            .route("/horizontalpodautoscalers", get(handler::hpa::watch_all)),
+            .route("/horizontalpodautoscalers", get(handler::hpa::watch_all))
+            .route("/gpujobs", get(handler::gpu_job::watch_all)),
     );
 
     #[rustfmt::skip]
@@ -167,6 +186,7 @@ async fn main() -> Result<()> {
                 .merge(watch_routes)
                 .merge(metrics_routes)
                 .merge(func_routes)
+                .merge(gpujob_routes)
                 .nest("/tmp", tmp_file_service)
                 .route("/nodes", get(handler::node::list))
                 .route("/bindings", post(handler::binding::bind)),
