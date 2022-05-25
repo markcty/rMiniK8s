@@ -25,6 +25,23 @@ impl Object for ReplicaSet {
     }
 }
 
+impl std::fmt::Display for ReplicaSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{:<16} {}", "Name:", self.metadata.name)?;
+        writeln!(f, "{:<16} {}", "Selector:", self.spec.selector.to_string())?;
+        writeln!(f, "{:<16} {}", "Labels:", self.metadata.labels.to_string())?;
+        if self.status.is_none() {
+            return Ok(());
+        }
+        let status = self.status.as_ref().unwrap();
+        writeln!(
+            f,
+            "{:<16} {} ready / {} current / {} desired",
+            "Replicas:", status.ready_replicas, status.replicas, self.spec.replicas
+        )
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ReplicaSetSpec {
     /// A label query over pods that should match the replica count.

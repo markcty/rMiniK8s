@@ -32,8 +32,16 @@ impl Arg {
         };
 
         for object in data {
-            if let KubeObject::Pod(pod) = object {
-                println!("{}", pod);
+            match object {
+                KubeObject::Pod(pod) => {
+                    println!("{}", pod);
+                },
+                KubeObject::ReplicaSet(rs) => {
+                    println!("{}", rs);
+                },
+                _ => {
+                    println!("{:#?}", object);
+                },
             }
         }
         Ok(())
