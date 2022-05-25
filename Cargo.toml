@@ -1,13 +1,14 @@
 [workspace]
 members = [
-    "rkubectl",
-    "api_server",
-    "rkubelet",
-    "resources",
-    "controllers",
-    "scheduler",
-    "rkube_proxy",
+  "rkubectl",
+  "api_server",
+  "rkubelet",
+  "resources",
+  "controllers",
+  "scheduler",
+  "rkube_proxy",
+  "serverless",
 ]
 
 [patch.crates-io]
-bollard = { git = 'https://github.com/y-young/bollard' }
+bollard = {git = 'https://github.com/y-young/bollard'}

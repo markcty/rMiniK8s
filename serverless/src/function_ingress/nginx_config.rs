@@ -32,6 +32,7 @@ const SERVER_BASE: &str = r#"
 server {
     server_name SERVER_NAME;
     listen 80;
+    proxy_set_header FUNCTION-NAME FUNC_NAME;
 
     LOCATIONS
 }
@@ -43,12 +44,13 @@ location PATH {
 }
 "#;
 
-pub struct NginxIngressConfig {
+pub struct NginxConfig {
     servers: Vec<IngressHost>,
 }
 
 pub struct IngressHost {
     host: String,
+    func_name: String,
     paths: Vec<IngressPath>,
 }
 
@@ -58,7 +60,7 @@ pub struct IngressPath {
     port: u16,
 }
 
-impl NginxIngressConfig {
+impl NginxConfig {
     pub fn new() -> Self {
         Self {
             servers: vec![],
@@ -91,14 +93,15 @@ impl NginxIngressConfig {
 }
 
 impl IngressHost {
-    pub fn new(host: &String) -> Self {
+    pub fn new(host: &String, func_name: &str) -> Self {
         Self {
             host: host.to_owned(),
+            func_name: func_name.to_owned(),
             paths: vec![],
         }
     }
 
-    pub fn add_path(&mut self, path: &String, svc_ip: &Ipv4Addr, svc_port: &u16) {
+    pub fn add_path(&mut self, path: &str, svc_ip: &Ipv4Addr, svc_port: &u16) {
         self.paths.push(IngressPath {
             path: path.to_owned(),
             ip: svc_ip.to_owned(),
@@ -107,7 +110,7 @@ impl IngressHost {
     }
 }
 
-impl ToString for NginxIngressConfig {
+impl ToString for NginxConfig {
     fn to_string(&self) -> String {
         let servers = self.servers.iter().fold(String::new(), |acc, server| {
             acc + server.to_string().as_str()
@@ -125,6 +128,7 @@ impl ToString for IngressHost {
     fn to_string(&self) -> String {
         let out = SERVER_BASE.to_string();
         let out = out.replace("SERVER_NAME", &self.host);
+        let out = out.replace("FUNC_NAME", self.func_name.as_str());
         let locations = self
             .paths
             .iter()

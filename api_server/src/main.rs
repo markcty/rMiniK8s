@@ -35,7 +35,7 @@ pub struct AppState {
 async fn main() -> Result<()> {
     // read config
     let config = Config::builder()
-        .add_source(config::File::with_name("/etc/minik8s/api_server.yaml"))
+        .add_source(config::File::with_name("/etc/rminik8s/api_server.yaml"))
         .build()?
         .try_deserialize::<ServerConfig>()
         .with_context(|| "Failed to parse config".to_string())?;
@@ -107,13 +107,6 @@ async fn main() -> Result<()> {
     );
 
     #[rustfmt::skip]
-    let func_routes = Router::new().nest(
-        "/func",
-        Router::new()
-            .route("/",post(handler::function::create))
-    );
-
-    #[rustfmt::skip]
     let ingress_route = Router::new().nest(
         "/ingresses",
         Router::new()
@@ -167,7 +160,24 @@ async fn main() -> Result<()> {
             .route("/services", get(handler::service::watch_all))
             .route("/ingresses",get(handler::ingress::watch_all))
             .route("/horizontalpodautoscalers", get(handler::hpa::watch_all))
-            .route("/gpujobs", get(handler::gpu_job::watch_all)),
+            .route("/gpujobs", get(handler::gpu_job::watch_all))
+            .route("/functions", get(handler::function::watch_all))
+            .route("/functions/:name", get(handler::function::watch_one)),
+    );
+
+    let function_routes = Router::new().nest(
+        "/functions",
+        Router::new()
+            .route(
+                "/",
+                get(handler::function::list).post(handler::function::create),
+            )
+            .route(
+                "/:name",
+                get(handler::function::get)
+                    .put(handler::function::update)
+                    .delete(handler::function::delete),
+            ),
     );
 
     #[rustfmt::skip]
@@ -198,8 +208,8 @@ async fn main() -> Result<()> {
                 .merge(watch_routes)
                 .merge(metrics_routes)
                 .merge(node_routes)
-                .merge(func_routes)
                 .merge(gpujob_routes)
+                .merge(function_routes)
                 .nest("/tmp", tmp_file_service)
                 .route("/bindings", post(handler::binding::bind)),
         )

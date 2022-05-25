@@ -1,14 +1,24 @@
 [package]
 edition = "2021"
-name = "scheduler"
+name = "serverless"
 version = "0.1.0"
+
+[[bin]]
+name = "function-ingress"
+path = "src/function_ingress/main.rs"
+
+[[bin]]
+name = "activator"
+path = "src/activator/main.rs"
 
 [dependencies]
 anyhow = {version = "1.0.56", features = ["backtrace"]}
-dashmap = "5.3.3"
+dotenv = "0.15.0"
+hyper = "0.14.18"
+lazy_static = "1.4.0"
+nginx-config = "0.13.2"
 reqwest = {version = "0.11", features = ["blocking", "json"]}
 resources = {path = "../resources"}
-serde_json = "1.0.79"
 tokio = {version = "1.17.0", features = ["full"]}
 tokio-tungstenite = "0.17.1"
 tracing = "0.1.32"

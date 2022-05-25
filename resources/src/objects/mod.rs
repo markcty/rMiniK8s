@@ -8,6 +8,7 @@ use uuid::Uuid;
 use self::object_reference::ObjectReference;
 
 pub mod binding;
+pub mod function;
 pub mod gpu_job;
 pub mod hpa;
 pub mod ingress;
@@ -30,6 +31,7 @@ pub enum KubeObject {
     Ingress(ingress::Ingress),
     HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
     GpuJob(gpu_job::GpuJob),
+    Function(function::Function),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -71,7 +73,11 @@ pub trait Object:
     /// Return the kind of the object in plural
     /// e.g. "Pods"
     fn kind_plural(&self) -> String {
-        self.kind().to_string() + "s"
+        if self.kind() == "ingress" {
+            self.kind().to_string() + "es"
+        } else {
+            self.kind().to_string() + "s"
+        }
     }
 
     /// Return the name of the object

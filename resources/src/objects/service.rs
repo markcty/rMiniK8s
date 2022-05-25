@@ -1,8 +1,12 @@
-use std::{collections::HashSet, fmt::Debug, net::Ipv4Addr};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    net::Ipv4Addr,
+};
 
 use serde::{Deserialize, Serialize};
 
-use super::{Metadata, Object};
+use super::{object_reference::ObjectReference, Metadata, Object};
 use crate::objects::Labels;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -42,4 +46,31 @@ pub struct ServicePort {
     pub port: u16,
     /// Number of the port to access on the pods targeted by the service.
     pub target_port: u16,
+}
+
+impl Service {
+    pub fn from_function(name: &str, func_name: &str, cluster_ip: Ipv4Addr) -> Self {
+        let metadata = Metadata {
+            name: name.to_owned(),
+            uid: None,
+            labels: Labels::default(),
+            owner_references: vec![ObjectReference {
+                kind: "function".to_string(),
+                name: func_name.to_string(),
+            }],
+        };
+        let spec = ServiceSpec {
+            selector: Labels(HashMap::from([("func".to_string(), func_name.to_string())])),
+            ports: vec![ServicePort {
+                port: 80,
+                target_port: 80,
+            }],
+            endpoints: HashSet::new(),
+            cluster_ip: Some(cluster_ip),
+        };
+        Self {
+            metadata,
+            spec,
+        }
+    }
 }

@@ -1,17 +1,17 @@
 [package]
+edition = "2021"
 name = "rkubectl"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
-clap = { version = "3.1.8", features = ["derive"] }
-serde = { version = "1.0.136", features = ["derive"] }
-serde_yaml = "0.8.23"
-reqwest = { version = "0.11", features = ["blocking", "json", "multipart"] }
 anyhow = "1.0.56"
-lazy_static = "1.4.0"
-resources = { path = "../resources" }
 chrono = "0.4.19"
 chrono-humanize = "0.2.1"
+clap = {version = "3.1.8", features = ["derive"]}
+lazy_static = "1.4.0"
+reqwest = {version = "0.11", features = ["blocking", "json", "multipart"]}
+resources = {path = "../resources"}
+serde = {version = "1.0.136", features = ["derive"]}
+serde_yaml = "0.8.23"
 strum = "0.24.0"
 serde_json = "1.0.81"
