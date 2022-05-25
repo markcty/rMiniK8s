@@ -5,8 +5,11 @@ use clap::Args;
 use reqwest::blocking::Client;
 use resources::{
     models::Response,
-    objects::KubeObject::{
-        self, GpuJob, HorizontalPodAutoscaler, Ingress, Pod, ReplicaSet, Service,
+    objects::{
+        node::NodeAddressType,
+        KubeObject::{
+            self, GpuJob, HorizontalPodAutoscaler, Ingress, Node, Pod, ReplicaSet, Service,
+        },
     },
 };
 
@@ -185,6 +188,25 @@ impl Arg {
                             status.active,
                             status.failed,
                             status.succeeded
+                        );
+                    }
+                }
+            },
+            ResourceKind::Nodes => {
+                println!(
+                    "{:<16} {:<16} {:<}",
+                    "NAME", "LAST HEARTBEAT", "INTERNAL IP"
+                );
+                for object in data {
+                    if let Node(node) = object {
+                        println!(
+                            "{:<16} {:<16} {:<}",
+                            node.metadata.name,
+                            calc_age(node.status.last_heartbeat),
+                            node.status
+                                .addresses
+                                .get(&NodeAddressType::InternalIP)
+                                .unwrap_or(&"".to_string())
                         );
                     }
                 }
