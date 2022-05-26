@@ -39,6 +39,9 @@ impl Arg {
                 KubeObject::ReplicaSet(rs) => {
                     println!("{}", rs);
                 },
+                KubeObject::Node(node) => {
+                    println!("{}", node);
+                },
                 _ => {
                     println!("{:#?}", object);
                 },

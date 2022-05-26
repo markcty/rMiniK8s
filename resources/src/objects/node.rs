@@ -1,7 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write};
 
-use chrono::NaiveDateTime;
+use chrono::{Local, NaiveDateTime, TimeZone};
+use indenter::indented;
 use serde::{Deserialize, Serialize};
+use strum::Display;
 
 use super::{Metadata, Object};
 
@@ -18,6 +20,33 @@ impl Object for Node {
 
     fn name(&self) -> &String {
         &self.metadata.name
+    }
+}
+
+impl std::fmt::Display for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{:<16} {}", "Name:", self.metadata.name)?;
+        writeln!(f, "{:<16} {}", "Labels:", self.metadata.labels.to_string())?;
+        let status = &self.status;
+        writeln!(
+            f,
+            "{:<16} {}",
+            "Last Heartbeat:",
+            Local.from_utc_datetime(&status.last_heartbeat)
+        )?;
+
+        writeln!(f, "Addresses:")?;
+        for (address_type, address) in status.addresses.iter() {
+            writeln!(indented(f), "{}: {}", address_type, address)?;
+        }
+
+        writeln!(f, "Capacity:")?;
+        write!(indented(f), "{}", status.capacity)?;
+        writeln!(f, "Allocatable:")?;
+        write!(indented(f), "{}", status.allocatable)?;
+
+        writeln!(f, "System Info:")?;
+        write!(indented(f), "{}", status.node_info)
     }
 }
 
@@ -53,7 +82,7 @@ impl Default for NodeStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Serialize, Deserialize, Display, PartialEq, Eq, Hash, Clone)]
 pub enum NodeAddressType {
     Hostname,
     ExternalIP,
@@ -74,10 +103,26 @@ pub struct NodeInfo {
     pub os_image: String,
 }
 
+impl std::fmt::Display for NodeInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{:<20} {}", "Architecture:", self.architecture)?;
+        writeln!(f, "{:<20} {}", "Machine ID:", self.machine_id)?;
+        writeln!(f, "{:<20} {}", "Operating System:", self.operating_system)?;
+        writeln!(f, "{:<20} {}", "OS Image:", self.os_image)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct Capacity {
     /// Number of cpu cores on the node.
     pub cpu: u16,
     /// Amount of memory in kilobytes.
     pub memory: u64,
+}
+
+impl std::fmt::Display for Capacity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "CPU: {}", self.cpu)?;
+        writeln!(f, "Memory: {}KB", self.memory)
+    }
 }
