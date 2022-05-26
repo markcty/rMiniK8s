@@ -9,6 +9,8 @@ echo "ARCH: $ARCH"
 IP=$(ip route get 114.114.114.114 | awk '{ print $7; exit }')
 echo "IP: $IP"
 
+mkdir -p /etc/rminik8s
+
 # install flannel
 if [ ! -f /usr/local/bin/flanneld ]; then
   echo "Installing flanneld ..."
@@ -41,6 +43,7 @@ echo "flanneld started"
 
 # start control plane
 set -a; source /run/flannel/subnet.env; set +a
+cp ./prometheus.yml /etc/rminik8s/prometheus.yml
 docker-compose up -d -p minik8s-control-plane
 echo "control plane started"
 
