@@ -59,6 +59,34 @@ pub async fn create(
     let function = KubeObject::Function(Function::new(name.to_owned(), service.uri(), filename));
     etcd_put(&app_state, &function).await?;
 
+    let mut i = 0;
+    loop {
+        let function = etcd_get_object(
+            &app_state,
+            format!("/api/v1/functions/{}", name),
+            Some("function"),
+        )
+        .await?;
+        if let KubeObject::Function(function) = function {
+            if let Some(image) = function.status.image {
+                tracing::info!("Image for function {} is created, name: {}", name, image);
+                break;
+            }
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        if i % 5 == 0 {
+            tracing::info!("Image creation for function {} is still pending", name);
+        }
+        if i == 60 {
+            tracing::warn!("Image creation for function {} timeout", name);
+            return Err(ErrResponse::new(
+                format!("Image creation for function {} timeout", name),
+                None,
+            ));
+        }
+        i += 1;
+    }
+
     let res = Response::new(Some(format!("function/{} created", name)), None);
     Ok(Json(res))
 }
