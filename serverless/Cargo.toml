@@ -4,12 +4,8 @@ name = "serverless"
 version = "0.1.0"
 
 [[bin]]
-name = "function-ingress"
-path = "src/function_ingress/main.rs"
-
-[[bin]]
-name = "activator"
-path = "src/activator/main.rs"
+name = "serverless-router"
+path = "src/router/main.rs"
 
 [dependencies]
 anyhow = {version = "1.0.56", features = ["backtrace"]}
