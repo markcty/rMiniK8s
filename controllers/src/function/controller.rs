@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File},
-    io::Write,
-    process::Command,
+    io::{ErrorKind, Write},
+    process::{Command, Stdio},
 };
 
 use anyhow::{anyhow, Context, Error, Result};
@@ -17,7 +17,7 @@ use tokio::{
 };
 
 use crate::{
-    utils::{create_informer, Event, ResyncNotification},
+    utils::{create_informer, log_command, Event, ResyncNotification},
     CONFIG, DOCKER_REGISTRY, TEMPLATES_DIR, TMP_DIR,
 };
 
@@ -125,14 +125,27 @@ impl FunctionController {
         let tag = format!("{}/{}", DOCKER_REGISTRY, func.name());
         tracing::info!("building image: {}", tag);
         let func_dir_path = std::path::Path::new(TMP_DIR).join(func.name());
-        Command::new("docker")
+        let output = Command::new("docker")
             .current_dir(&func_dir_path)
             .args(["build", "-t", tag.as_str(), "."])
-            .output()?;
-        Command::new("docker")
+            .stdout(Stdio::piped())
+            .spawn()?
+            .stdout
+            .ok_or_else(|| {
+                std::io::Error::new(ErrorKind::Other, "Could not capture standard output.")
+            })?;
+        log_command(output);
+        let output = Command::new("docker")
             .current_dir(&func_dir_path)
             .args(["push", tag.as_str()])
-            .output()?;
+            .stdout(Stdio::piped())
+            .spawn()?
+            .stdout
+            .ok_or_else(|| {
+                std::io::Error::new(ErrorKind::Other, "Could not capture standard output.")
+            })?;
+        log_command(output);
+
         Ok(tag)
     }
 

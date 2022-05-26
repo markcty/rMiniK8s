@@ -1,3 +1,8 @@
+use std::{
+    io::{BufRead, BufReader},
+    process::ChildStdout,
+};
+
 use anyhow::{anyhow, Error};
 use reqwest::Url;
 use resources::{
@@ -89,4 +94,13 @@ pub fn create_informer<T: Object>(
     }));
 
     Informer::new(lw, eh, rh)
+}
+
+pub fn log_command(stdout: ChildStdout) {
+    let reader = BufReader::new(stdout);
+
+    reader
+        .lines()
+        .filter_map(|line| line.ok())
+        .for_each(|line| tracing::info!("{}", line));
 }
