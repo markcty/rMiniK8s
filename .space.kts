@@ -26,6 +26,13 @@ job("Run tests & Build") {
 }
 
 job("Build docker images") {
+    startOn {
+        gitPush {
+            branchFilter {
+                +"refs/heads/develop"
+            }
+        }
+    }
 
     container(displayName = "Compile", image = "minik8s.xyz/rust:latest") {
         resources {

@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use anyhow::{Context, Result};
-use config::{Config, File};
+use config::{Config, Environment, File};
 use resources::config::ClusterConfig;
 
 mod horizontal;
@@ -12,7 +12,8 @@ mod utils;
 
 lazy_static! {
     pub static ref CONFIG: ClusterConfig = Config::builder()
-        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml"))
+        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml").required(false))
+        .add_source(Environment::default())
         .build()
         .unwrap_or_default()
         .try_deserialize::<ClusterConfig>()

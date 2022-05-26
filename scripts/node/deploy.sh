@@ -51,7 +51,7 @@ systemctl restart flanneld.service
 echo "flanneld started"
 
 while [ ! -f /run/flannel/subnet.env ]; do
-  sleep 1
+  sleep 0.1
 done
 systemctl restart kdocker.service
 echo "docker started"
