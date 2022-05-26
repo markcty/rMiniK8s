@@ -22,8 +22,8 @@ pub struct FunctionSpec {
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionStatus {
-    /// whether an image named minik8s.xyz/{func_name}:latest is pushed to registry
-    pub image_ready: bool,
+    /// the name of image which wraps this function
+    pub image: Option<String>,
     /// where the function is ready for the client to request
     pub ready: bool,
 }
@@ -53,7 +53,7 @@ impl Function {
             service_ref: svc_name,
         };
         let status = FunctionStatus {
-            image_ready: false,
+            image: None,
             ready: false,
         };
         Self {

@@ -26,11 +26,16 @@ path = "src/podautoscaler/main.rs"
 name = "gpujob-controller"
 path = "src/gpu_job/main.rs"
 
+[[bin]]
+name = "function-controller"
+path = "src/function/main.rs"
+
 [dependencies]
 anyhow = {version = "1.0.56", features = ["backtrace"]}
 chrono = "0.4.19"
 config = {version = "0.13.1", features = ["yaml"]}
 dotenv = "0.15.0"
+fs_extra = "1.2.0"
 futures-delay-queue = "0.5.2"
 futures-intrusive = "0.4"
 lazy_static = "1.4.0"
