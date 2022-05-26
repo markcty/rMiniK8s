@@ -52,7 +52,7 @@ impl Service {
     pub fn from_function(name: &str, func_name: &str, cluster_ip: Ipv4Addr) -> Self {
         let metadata = Metadata {
             name: name.to_owned(),
-            uid: None,
+            uid: Some(uuid::Uuid::new_v4()),
             labels: Labels::default(),
             owner_references: vec![ObjectReference {
                 kind: "function".to_string(),

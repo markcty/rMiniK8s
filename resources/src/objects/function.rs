@@ -30,7 +30,7 @@ pub struct FunctionStatus {
 
 impl Object for Function {
     fn kind(&self) -> &'static str {
-        "function"
+        "Function"
     }
 
     fn name(&self) -> &String {
@@ -43,7 +43,7 @@ impl Function {
         let host = format!("{}.func.minik8s.com", name);
         let metadata = Metadata {
             name,
-            uid: None,
+            uid: Some(uuid::Uuid::new_v4()),
             labels: super::Labels::new(),
             owner_references: Vec::new(),
         };

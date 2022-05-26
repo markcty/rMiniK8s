@@ -1,45 +1,51 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use hyper::{http::uri::Scheme, Body, Client, Request, Response, StatusCode, Uri};
+use prometheus::{Encoder, TextEncoder};
 use resources::{
     informer::Store,
     objects::{function::Function, service::Service, KubeObject},
 };
 
-use crate::CONFIG;
+use crate::{CONFIG, REQUESTS_COUNTER};
 
 async fn route(mut req: Request<Body>, func_store: Store<Function>) -> Result<Response<Body>> {
     let need_activate;
     let func_key;
+    let func_name;
     // find the function
     {
         let host = req
             .headers()
             .get(hyper::header::HOST)
             .ok_or_else(|| anyhow!("No host"))?
-            .to_str()?;
+            .to_str()?
+            // strip off the port
+            .split(':')
+            .next()
+            .ok_or_else(|| anyhow!("No host"))?;
 
         let func_store = func_store.read().await;
         let (key, func) = func_store
             .iter()
             .find(|(_, func)| func.spec.host == host)
-            .ok_or_else(|| anyhow!("No such function"))?;
+            .ok_or_else(|| anyhow!("No such function matching host: {}", host))?;
         func_key = key.to_owned();
+        func_name = func.metadata.name.to_owned();
         need_activate = !func.status.ready;
     }
+
+    REQUESTS_COUNTER.with_label_values(&[&func_name]).inc();
 
     if need_activate {
         activate(func_key.clone(), func_store.clone()).await?;
     }
-
-    // push metrics
-    metric(func_key.as_str());
 
     // get real service
     let svc_name = func_store
         .read()
         .await
         .get(&func_key)
-        .ok_or_else(|| anyhow!("No such function"))?
+        .ok_or_else(|| anyhow!("No service found for function {}", func_name))?
         .spec
         .service_ref
         .clone();
@@ -62,8 +68,14 @@ async fn route(mut req: Request<Body>, func_store: Store<Function>) -> Result<Re
     Ok(client.request(req).await?)
 }
 
-// TODO
-fn metric(_func: &str) {}
+/// Return Prometheus metrics
+fn metrics() -> Result<String> {
+    let metrics = prometheus::gather();
+    let encoder = TextEncoder::new();
+    let mut buffer = Vec::new();
+    encoder.encode(&metrics, &mut buffer)?;
+    String::from_utf8(buffer).with_context(|| "Failed to encode metrics")
+}
 
 async fn get_svc(svc_name: &str) -> Result<Service> {
     let client = reqwest::Client::new();
@@ -110,12 +122,23 @@ async fn activate(func_key: String, func_store: Store<Function>) -> Result<()> {
 }
 
 pub async fn router(req: Request<Body>, func_store: Store<Function>) -> Response<Body> {
-    match route(req, func_store).await {
-        Ok(res) => res,
-        Err(err) => {
-            let mut res = Response::new(Body::from(err.to_string()));
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-            res
-        },
+    if req.uri().path() == "/metrics" {
+        match metrics() {
+            Ok(res) => Response::new(Body::from(res)),
+            Err(err) => {
+                let mut res = Response::new(Body::from(err.to_string()));
+                *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                res
+            },
+        }
+    } else {
+        match route(req, func_store).await {
+            Ok(res) => res,
+            Err(err) => {
+                let mut res = Response::new(Body::from(err.to_string()));
+                *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                res
+            },
+        }
     }
 }

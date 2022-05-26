@@ -8,6 +8,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
+use prometheus::{opts, register_counter_vec, CounterVec};
 use reqwest::Url;
 use resources::models::NodeConfig;
 
@@ -27,6 +28,11 @@ lazy_static! {
             },
         }
     };
+    static ref REQUESTS_COUNTER: CounterVec = register_counter_vec!(
+        opts!("function_requests_total", "Total number of requests"),
+        &["function"] // labels
+    )
+    .unwrap();
 }
 
 mod route;
