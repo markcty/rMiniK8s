@@ -12,9 +12,9 @@ use resources::{
     informer::{EventHandler, Informer, ResyncHandler, Store},
     objects::{
         hpa::{
-            HPAScalingRules, HorizontalPodAutoscaler, HorizontalPodAutoscalerBehavior,
-            HorizontalPodAutoscalerStatus, MetricTarget, PolicySelection, ResourceMetricSource,
-            ScalingPolicyType,
+            FunctionMetricSource, HPAScalingRules, HorizontalPodAutoscaler,
+            HorizontalPodAutoscalerBehavior, HorizontalPodAutoscalerStatus, MetricSource,
+            MetricTarget, PolicySelection, ResourceMetricSource, ScalingPolicyType,
         },
         pod::Pod,
         KubeObject, Labels, Object,
@@ -173,24 +173,37 @@ impl PodAutoscaler {
                         });
                 }
 
-                let desired_replicas = if rs.spec.replicas == 0 && hpa.spec.min_replicas != 0 {
+                if current_replicas != status.current_replicas {
+                    self.record_scale_event(
+                        hpa_name,
+                        &hpa.spec.behavior,
+                        status.current_replicas,
+                        current_replicas,
+                    );
+                }
+
+                let desired_replicas = if current_replicas == 0 {
                     // Scaling disabled
                     0
                 } else if current_replicas > hpa.spec.max_replicas {
                     hpa.spec.max_replicas
                 } else if current_replicas < hpa.spec.min_replicas {
                     hpa.spec.min_replicas
-                } else if current_replicas == 0 {
-                    1
                 } else {
-                    let desired_replicas = self
-                        .compute_resource_replicas(
-                            &hpa.spec.metrics,
-                            &hpa,
-                            current_replicas,
-                            &rs.spec.selector,
-                        )
-                        .await?;
+                    let desired_replicas = match &hpa.spec.metrics {
+                        MetricSource::Resource(metrics) => {
+                            self.compute_resource_replicas(
+                                metrics,
+                                current_replicas,
+                                &rs.spec.selector,
+                            )
+                            .await?
+                        },
+                        MetricSource::Function(metrics) => {
+                            self.compute_function_replicas(metrics, current_replicas)
+                                .await?
+                        },
+                    };
                     tracing::info!("Desired replicas for {}: {}", hpa_name, desired_replicas);
                     self.normalize_desired_replicas(
                         hpa_name,
@@ -203,12 +216,6 @@ impl PodAutoscaler {
                 if current_replicas != desired_replicas {
                     // Do scale
                     rs.spec.replicas = desired_replicas;
-                    self.record_scale_event(
-                        hpa_name,
-                        &hpa.spec.behavior,
-                        current_replicas,
-                        desired_replicas,
-                    );
                     target = KubeObject::ReplicaSet(rs);
                     post_update(&target).await?;
                     tracing::info!(
@@ -243,7 +250,6 @@ impl PodAutoscaler {
     async fn compute_resource_replicas(
         &self,
         metrics: &ResourceMetricSource,
-        hpa: &HorizontalPodAutoscaler,
         current_replicas: u32,
         selector: &Labels,
     ) -> Result<u32, Error> {
@@ -253,22 +259,27 @@ impl PodAutoscaler {
                     .calc_replicas_by_utilization(
                         current_replicas,
                         target_utilization,
-                        &hpa.spec.metrics.name,
+                        &metrics.name,
                         selector,
                     )
                     .await
             },
             MetricTarget::AverageValue(target_value) => {
                 self.calculator
-                    .calc_replicas_by_value(
-                        current_replicas,
-                        target_value,
-                        &hpa.spec.metrics.name,
-                        selector,
-                    )
+                    .calc_replicas_by_value(current_replicas, target_value, &metrics.name, selector)
                     .await
             },
         }
+    }
+
+    async fn compute_function_replicas(
+        &self,
+        metrics: &FunctionMetricSource,
+        current_replicas: u32,
+    ) -> Result<u32, Error> {
+        self.calculator
+            .calc_function_replicas(current_replicas, metrics.target, &metrics.name)
+            .await
     }
 
     fn normalize_desired_replicas(
@@ -495,6 +506,12 @@ impl PodAutoscaler {
         prev_replicas: u32,
         new_replicas: u32,
     ) {
+        tracing::debug!(
+            "Record scale event for {}: {} -> {}",
+            hpa_name,
+            prev_replicas,
+            new_replicas
+        );
         match new_replicas.cmp(&prev_replicas) {
             // Scaling up
             Ordering::Greater => {

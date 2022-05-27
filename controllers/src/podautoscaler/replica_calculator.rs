@@ -127,6 +127,24 @@ impl ReplicaCalculator {
         }
     }
 
+    /// Calculate desired replica count based on function QPS metrics
+    pub async fn calc_function_replicas(
+        &self,
+        current_replicas: u32,
+        target_value: u64,
+        func_name: &str,
+    ) -> Result<u32> {
+        let metric = self.client.get_function_metric(func_name).await?;
+        let current_value = metric.value / current_replicas as i64;
+        tracing::info!(
+            "Calculating function replicas: current_value={}, current_total={}",
+            current_value,
+            metric.value
+        );
+        let scale_ratio = current_value as f64 / target_value as f64;
+        Ok((current_replicas as f64 * scale_ratio).ceil() as u32)
+    }
+
     /// Filter out failed and invalid pods
     fn filter_pods(&self, metrics: &mut PodMetricsInfo, pods: &[Pod]) -> Result<Vec<Pod>> {
         // Pods that haven't been present in the metrics yet

@@ -3,7 +3,7 @@ use reqwest::Client;
 use resources::{
     models::Response,
     objects::{
-        metrics::{PodMetric, PodMetrics, PodMetricsInfo, Resource},
+        metrics::{FunctionMetric, PodMetric, PodMetrics, PodMetricsInfo, Resource},
         Labels,
     },
 };
@@ -77,6 +77,23 @@ impl MetricsClient {
         match response.data {
             Some(data) => Ok(data),
             None => Err(anyhow::anyhow!("Failed to get pod metrics")),
+        }
+    }
+
+    pub async fn get_function_metric(&self, func_name: &str) -> Result<FunctionMetric> {
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/v1/metrics/functions/{}",
+                CONFIG.api_server_url, func_name
+            ))
+            .send()
+            .await?
+            .json::<Response<FunctionMetric>>()
+            .await?;
+        match response.data {
+            Some(data) => Ok(data),
+            None => Err(anyhow::anyhow!("Failed to get function metrics")),
         }
     }
 }

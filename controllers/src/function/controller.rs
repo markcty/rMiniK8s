@@ -9,7 +9,10 @@ use fs_extra::dir::{copy, CopyOptions};
 use reqwest::Client;
 use resources::{
     models::Response,
-    objects::{function::Function, replica_set::ReplicaSet, KubeObject, Object},
+    objects::{
+        function::Function, hpa::HorizontalPodAutoscaler, replica_set::ReplicaSet, KubeObject,
+        Object,
+    },
 };
 use tokio::{
     select,
@@ -76,6 +79,7 @@ impl FunctionController {
         tracing::info!("New function: {}", func.metadata.name);
         self.build_function_image(&mut func).await?;
         self.create_replica_set(&func).await?;
+        self.create_hpa(&func).await?;
         Ok(())
     }
 
@@ -192,6 +196,25 @@ impl FunctionController {
             .with_context(|| "Error creating replicaset")?;
         tracing::info!(
             "Created replicaset for Function {}: {}",
+            func.metadata.name,
+            response.msg.unwrap_or_else(|| "".to_string())
+        );
+        Ok(())
+    }
+
+    async fn create_hpa(&self, func: &Function) -> Result<()> {
+        let hpa = HorizontalPodAutoscaler::from_function(func);
+        let response = self
+            .client
+            .post(format!("{}{}", CONFIG.api_server_url, hpa.prefix()))
+            .json(&KubeObject::HorizontalPodAutoscaler(hpa))
+            .send()
+            .await?
+            .json::<Response<()>>()
+            .await
+            .with_context(|| "Error creating HPA")?;
+        tracing::info!(
+            "Created HPA for Function {}: {}",
             func.metadata.name,
             response.msg.unwrap_or_else(|| "".to_string())
         );

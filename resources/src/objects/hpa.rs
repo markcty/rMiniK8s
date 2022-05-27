@@ -1,7 +1,9 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use super::{metrics::Resource, object_reference::ObjectReference, Metadata, Object};
+use super::{
+    function::Function, metrics::Resource, object_reference::ObjectReference, Metadata, Object,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct HorizontalPodAutoscaler {
@@ -17,6 +19,39 @@ impl Object for HorizontalPodAutoscaler {
 
     fn name(&self) -> &String {
         &self.metadata.name
+    }
+}
+
+impl HorizontalPodAutoscaler {
+    pub fn from_function(func: &Function) -> Self {
+        let func_name = func.metadata.name.to_owned();
+        let metadata = Metadata {
+            name: func_name.to_owned(),
+            uid: None,
+            labels: func.metadata.labels.clone(),
+            owner_references: vec![ObjectReference {
+                kind: "function".to_string(),
+                name: func_name.to_owned(),
+            }],
+        };
+        let spec = HorizontalPodAutoscalerSpec {
+            scale_target_ref: ObjectReference {
+                kind: "ReplicaSet".to_string(),
+                name: func_name.to_owned(),
+            },
+            behavior: HorizontalPodAutoscalerBehavior::default(),
+            min_replicas: 0,
+            max_replicas: 10,
+            metrics: MetricSource::Function(FunctionMetricSource {
+                name: func_name,
+                target: 30,
+            }),
+        };
+        Self {
+            metadata,
+            spec,
+            status: None,
+        }
     }
 }
 
@@ -51,12 +86,16 @@ pub struct HorizontalPodAutoscalerSpec {
     /// by the current number of pods.
     /// Ergo, metrics used must decrease as the pod count is increased, and vice-versa.
     /// If not set, the default metric will be set to 80% average CPU utilization.
-    #[serde(default)]
-    pub metrics: ResourceMetricSource,
+    #[serde(default = "default_metrics")]
+    pub metrics: MetricSource,
 }
 
 fn default_min_replicas() -> u32 {
     1
+}
+
+fn default_metrics() -> MetricSource {
+    MetricSource::Resource(ResourceMetricSource::default())
 }
 
 /// HorizontalPodAutoscalerBehavior configures the scaling behavior
@@ -197,6 +236,13 @@ pub enum ScalingPolicyType {
     Percent,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(tag = "type")]
+pub enum MetricSource {
+    Resource(ResourceMetricSource),
+    Function(FunctionMetricSource),
+}
+
 /// ResourceMetricSource indicates how to scale on a resource metric
 /// known to Kubernetes, as specified in requests and limits,
 /// describing each pod in the current scale target (e.g. CPU or memory).
@@ -216,6 +262,14 @@ impl Default for ResourceMetricSource {
             target: MetricTarget::AverageUtilization(80),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct FunctionMetricSource {
+    /// Name of the function.
+    pub name: String,
+    /// Target average queries in a 15s window.
+    pub target: u64,
 }
 
 /// MetricTarget defines the target value, average value,

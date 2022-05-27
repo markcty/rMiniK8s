@@ -180,8 +180,18 @@ pub async fn delete(
     )
     .await?;
     if let KubeObject::Function(func) = function {
-        etcd_delete(&app_state, func.spec.service_ref).await?;
-        etcd_delete(&app_state, format!("/api/v1/replicasets/{}", name)).await?;
+        etcd_delete(&app_state, func.spec.service_ref)
+            .await
+            .unwrap_or_else(|_| tracing::error!("Error deleting service"));
+        etcd_delete(&app_state, format!("/api/v1/replicasets/{}", name))
+            .await
+            .unwrap_or_else(|_| tracing::error!("Error deleting replicaset"));
+        etcd_delete(
+            &app_state,
+            format!("/api/v1/horizontalpodautoscalers/{}", name),
+        )
+        .await
+        .unwrap_or_else(|_| tracing::error!("Error deleting HPA"));
     }
     etcd_delete(&app_state, format!("/api/v1/functions/{}", name)).await?;
     let res = Response::new(Some(format!("functions/{} deleted", name)), None);
