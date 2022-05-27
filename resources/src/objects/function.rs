@@ -2,7 +2,7 @@ use std::default::Default;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Metadata, Object};
+use super::{Labels, Metadata, Object};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Function {
@@ -24,8 +24,6 @@ pub struct FunctionSpec {
 pub struct FunctionStatus {
     /// the name of image which wraps this function
     pub image: Option<String>,
-    /// where the function is ready for the client to request
-    pub ready: bool,
 }
 
 impl Object for Function {
@@ -41,10 +39,12 @@ impl Object for Function {
 impl Function {
     pub fn new(name: String, svc_name: String, filename: String) -> Self {
         let host = format!("{}.func.minik8s.com", name);
+        let mut labels = Labels::new();
+        labels.insert("function", &name);
         let metadata = Metadata {
             name,
             uid: Some(uuid::Uuid::new_v4()),
-            labels: super::Labels::new(),
+            labels,
             owner_references: Vec::new(),
         };
         let spec = FunctionSpec {
@@ -54,7 +54,6 @@ impl Function {
         };
         let status = FunctionStatus {
             image: None,
-            ready: false,
         };
         Self {
             metadata,

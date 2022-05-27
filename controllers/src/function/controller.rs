@@ -6,9 +6,10 @@ use std::{
 
 use anyhow::{anyhow, Context, Error, Result};
 use fs_extra::dir::{copy, CopyOptions};
+use reqwest::Client;
 use resources::{
     models::Response,
-    objects::{function::Function, KubeObject, Object},
+    objects::{function::Function, replica_set::ReplicaSet, KubeObject, Object},
 };
 use tokio::{
     select,
@@ -22,6 +23,7 @@ use crate::{
 };
 
 pub struct FunctionController {
+    client: Client,
     func_rx: Receiver<Event<Function>>,
     func_resync_rx: Receiver<ResyncNotification>,
     func_informer: Option<JoinHandle<Result<(), Error>>>,
@@ -37,6 +39,7 @@ impl FunctionController {
         let func_informer = tokio::spawn(async move { func_informer.run().await });
 
         Self {
+            client: Client::new(),
             func_rx,
             func_resync_rx,
             func_informer: Some(func_informer),
@@ -50,7 +53,7 @@ impl FunctionController {
             select! {
                 Some(event) = self.func_rx.recv() => {
                     let result = match event {
-                        Event::Add(mut func) => self.build_function_image(&mut func).await,
+                        Event::Add(func) => self.handle_function_add(func).await,
 
                         _ => {Ok(())}
                     };
@@ -66,6 +69,13 @@ impl FunctionController {
         let func_informer = std::mem::replace(&mut self.func_informer, None);
         func_informer.unwrap().await??;
         tracing::info!("Function Controller exited");
+        Ok(())
+    }
+
+    async fn handle_function_add(&mut self, mut func: Function) -> Result<()> {
+        tracing::info!("New function: {}", func.metadata.name);
+        self.build_function_image(&mut func).await?;
+        self.create_replica_set(&func).await?;
         Ok(())
     }
 
@@ -91,6 +101,7 @@ impl FunctionController {
         // copy templates
         let mut copy_option = CopyOptions::new();
         copy_option.content_only = true;
+        copy_option.overwrite = true;
         copy(TEMPLATES_DIR, func_dir_path, &copy_option)?;
         Ok(())
     }
@@ -150,9 +161,9 @@ impl FunctionController {
     }
 
     async fn post_status(&self, func: &Function) -> Result<()> {
-        let client = reqwest::Client::new();
         let name = func.metadata.name.to_owned();
-        let response = client
+        let response = self
+            .client
             .put(format!("{}{}", CONFIG.api_server_url, func.uri()))
             .json(&KubeObject::Function(func.to_owned()))
             .send()
@@ -163,6 +174,25 @@ impl FunctionController {
         tracing::info!(
             "Posted status for Function {}: {}",
             name,
+            response.msg.unwrap_or_else(|| "".to_string())
+        );
+        Ok(())
+    }
+
+    async fn create_replica_set(&self, func: &Function) -> Result<()> {
+        let rs = ReplicaSet::from_function(func);
+        let response = self
+            .client
+            .post(format!("{}{}", CONFIG.api_server_url, rs.prefix()))
+            .json(&KubeObject::ReplicaSet(rs))
+            .send()
+            .await?
+            .json::<Response<()>>()
+            .await
+            .with_context(|| "Error creating replicaset")?;
+        tracing::info!(
+            "Created replicaset for Function {}: {}",
+            func.metadata.name,
             response.msg.unwrap_or_else(|| "".to_string())
         );
         Ok(())

@@ -7,7 +7,7 @@ use indenter::indented;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-use super::{metrics, Metadata, Object};
+use super::{function::Function, metrics, Metadata, Object};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pod {
@@ -603,5 +603,33 @@ impl std::fmt::Display for ContainerPair {
         }
         writeln!(f, "Resources:")?;
         write!(f, "{}", container.resources)
+    }
+}
+
+impl PodTemplateSpec {
+    pub fn from_function(func: &Function) -> Self {
+        let func_name = func.metadata.name.to_owned();
+        let metadata = Metadata {
+            name: func_name.to_owned(),
+            uid: None,
+            labels: func.metadata.labels.clone(),
+            ..Default::default()
+        };
+        let spec = PodSpec {
+            containers: vec![Container {
+                name: func_name,
+                image: func.status.image.as_ref().unwrap().to_owned(),
+                image_pull_policy: Some(ImagePullPolicy::IfNotPresent),
+                ports: vec![ContainerPort {
+                    container_port: 80,
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        Self {
+            metadata,
+            spec,
+        }
     }
 }

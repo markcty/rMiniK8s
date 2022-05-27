@@ -60,7 +60,10 @@ impl Service {
             }],
         };
         let spec = ServiceSpec {
-            selector: Labels(HashMap::from([("func".to_string(), func_name.to_string())])),
+            selector: Labels(HashMap::from([(
+                "function".to_string(),
+                func_name.to_string(),
+            )])),
             ports: vec![ServicePort {
                 port: 80,
                 target_port: 80,

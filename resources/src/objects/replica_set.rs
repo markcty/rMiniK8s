@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use super::{pod::PodTemplateSpec, Labels, Metadata, Object};
+use super::{
+    function::Function, object_reference::ObjectReference, pod::PodTemplateSpec, Labels, Metadata,
+    Object,
+};
 
 /// ReplicaSet ensures that a specified number of pod replicas are running
 /// at any given time.
@@ -39,6 +42,31 @@ impl std::fmt::Display for ReplicaSet {
             "{:<16} {} ready / {} current / {} desired",
             "Replicas:", status.ready_replicas, status.replicas, self.spec.replicas
         )
+    }
+}
+
+impl ReplicaSet {
+    pub fn from_function(func: &Function) -> Self {
+        let func_name = func.metadata.name.to_owned();
+        let metadata = Metadata {
+            name: func_name.to_owned(),
+            uid: None,
+            labels: func.metadata.labels.clone(),
+            owner_references: vec![ObjectReference {
+                kind: "function".to_string(),
+                name: func_name,
+            }],
+        };
+        let spec = ReplicaSetSpec {
+            selector: func.metadata.labels.clone(),
+            template: PodTemplateSpec::from_function(func),
+            replicas: 0,
+        };
+        Self {
+            metadata,
+            spec,
+            status: None,
+        }
     }
 }
 

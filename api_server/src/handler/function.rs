@@ -47,7 +47,7 @@ pub async fn create(
     let filename = stream_to_tmp_file(original_filename.as_str(), field).await?;
 
     // create service object
-    let svc_name = unique_name("func-svc");
+    let svc_name = unique_name(&format!("func-{}", name));
     let service = KubeObject::Service(Service::from_function(
         &svc_name,
         name.as_str(),
@@ -180,11 +180,8 @@ pub async fn delete(
     )
     .await?;
     if let KubeObject::Function(func) = function {
-        etcd_delete(
-            &app_state,
-            format!("/api/v1/services/{}", func.spec.service_ref),
-        )
-        .await?;
+        etcd_delete(&app_state, func.spec.service_ref).await?;
+        etcd_delete(&app_state, format!("/api/v1/replicasets/{}", name)).await?;
     }
     etcd_delete(&app_state, format!("/api/v1/functions/{}", name)).await?;
     let res = Response::new(Some(format!("functions/{} deleted", name)), None);

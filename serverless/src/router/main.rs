@@ -10,9 +10,12 @@ use hyper::{
 };
 use prometheus::{opts, register_counter_vec, CounterVec};
 use reqwest::Url;
-use resources::models::NodeConfig;
+use resources::{
+    models::NodeConfig,
+    objects::{function::Function, service::Service},
+};
 
-use crate::{route::router, utils::create_func_informer};
+use crate::{route::router, utils::create_informer};
 
 lazy_static! {
     static ref CONFIG: NodeConfig = {
@@ -44,18 +47,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("Serverless router started");
 
     // let (tx, mut rx) = mpsc::channel::<Notification>(16);
-    let func_informer = create_func_informer();
+    let func_informer = create_informer::<Function>("functions");
     let func_store = func_informer.get_store();
     let func_informer_handler = tokio::spawn(async move { func_informer.run().await });
+
+    let svc_informer = create_informer::<Service>("services");
+    let svc_store = svc_informer.get_store();
+    let svc_informer_handler = tokio::spawn(async move { svc_informer.run().await });
 
     let addr = ([0, 0, 0, 0], 80).into();
     let service = make_service_fn(move |_| {
         let func_store = func_store.clone();
+        let svc_store = svc_store.clone();
 
         async move {
             Ok::<_, hyper::Error>(service_fn(move |req| {
                 let func_store = func_store.clone();
-                async move { Ok::<_, hyper::Error>(router(req, func_store).await) }
+                let svc_store = svc_store.clone();
+                async move { Ok::<_, hyper::Error>(router(req, func_store, svc_store).await) }
             }))
         }
     });
@@ -71,6 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     graceful.await?;
     func_informer_handler.abort();
+    svc_informer_handler.abort();
 
     Ok(())
 }
