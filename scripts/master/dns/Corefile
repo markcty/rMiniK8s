@@ -1,0 +1,17 @@
+.:53 {
+    forward . 119.29.29.29 114.114.114.114
+    log
+    errors
+}
+
+minik8s.com:53 {
+    file /config/ingress.db
+    log
+    errors
+}
+
+func.minik8s.com:53 {
+    file /config/function_router.db
+    log
+    errors
+}

@@ -1,0 +1,9 @@
+{
+  "registry-mirrors": [
+    "https://docker.mirrors.sjtug.sjtu.edu.cn"
+  ],
+  "dns": [
+    "${IP}",
+    "119.29.29.29"
+  ]
+}
