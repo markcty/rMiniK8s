@@ -44,7 +44,7 @@ impl ServiceTable {
             let rule = Self::gen_svc_rule(&svc_name, &cluster_ip, &port, &lb.lb_chain);
             self.ipt
                 .delete("nat", "KUBE-SERVICES", rule.as_str())
-                .unwrap();
+                .map_err(|e| tracing::warn!("KUBE-SERVICES delete rule failed, {}", e)).ok();
             lb.cleanup();
         }
     }
@@ -87,7 +87,7 @@ impl ServiceTable {
             let old_rule = Self::gen_svc_rule(&self.svc_name, &old_cluster_ip, port, &lb.lb_chain);
             self.ipt
                 .delete("nat", "KUBE-SERVICES", old_rule.as_str())
-                .unwrap();
+                .map_err(|e| tracing::warn!("KUBE-SERVICES delete rule failed, {}", e)).ok();
 
             let new_rule = Self::gen_svc_rule(&self.svc_name, new_cluster_ip, port, &lb.lb_chain);
             self.ipt
