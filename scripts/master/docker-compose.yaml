@@ -1,0 +1,69 @@
+version: "3"
+
+services:
+  api_server:
+    image: minik8s.xyz/api_server:latest
+    container_name: api_server
+    environment:
+      - "ETCD_ENDPOINT=${ETCD_ENDPOINT}"
+      - "METRICS_SERVER=prometheus:9090"
+    depends_on:
+      - prometheus
+    networks:
+      default:
+        ipv4_address: "$API_SERVER_IP"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      default:
+        ipv4_address: "$PROMETHEUS_IP"
+
+  endpoints-controller:
+    image: minik8s.xyz/endpoints-controller:latest
+    container_name: endpoints-controller
+    environment:
+      - API_SERVER_ENDPOINT=http://api_server:8080
+    depends_on:
+      - api_server
+
+  ingress-controller:
+    image: minik8s.xyz/ingress-controller:latest
+    container_name: ingress
+    environment:
+      - API_SERVER_ENDPOINT=http://api_server:8080
+    depends_on:
+      - api_server
+    networks:
+      default:
+        ipv4_address: "$INGRESS_IP"
+
+  replicaset-controller:
+    image: minik8s.xyz/replicaset-controller:latest
+    container_name: replicaset-controller
+    environment:
+      - API_SERVER_URL=http://api_server:8080
+      - API_SERVER_WATCH_URL=ws://api_server:8080
+    depends_on:
+      - api_server
+
+  cadvisor:
+    image: zcube/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8090:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: "${FLANNEL_SUBNET}"

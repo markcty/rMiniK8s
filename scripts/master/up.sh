@@ -66,10 +66,11 @@ envsubst <./dns/ingress.db.template > ./dns/ingress.db
 docker run -d --name dns \
   --restart=always \
   -v $(pwd)/dns:/config \
-  -p 53:53/udp \
+  --network host \
   coredns/coredns \
   -conf /config/Corefile
 printf "nameserver $IP\n" > /etc/resolv.conf
+printf "DNS server started\n\n"
 
 # start control plane
 docker-compose -p minik8s-control-plane up -d 
