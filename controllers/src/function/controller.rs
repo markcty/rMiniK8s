@@ -133,7 +133,7 @@ impl FunctionController {
     }
 
     async fn build_image(&self, func: &Function) -> Result<String> {
-        let tag = format!("{}/{}", DOCKER_REGISTRY, func.name());
+        let tag = format!("{}/{}:latest", DOCKER_REGISTRY, func.name());
         tracing::info!("building image: {}", tag);
         let func_dir_path = std::path::Path::new(TMP_DIR).join(func.name());
         let output = Command::new("docker")
