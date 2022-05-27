@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use axum::{extract::Query, Extension, Json};
+use axum::{
+    extract::{Path, Query},
+    Extension, Json,
+};
 use axum_macros::debug_handler;
 use chrono::Local;
 use prometheus_http_api::{
@@ -10,7 +13,7 @@ use prometheus_http_api::{
 use resources::{
     models::{ErrResponse, Response},
     objects::{
-        metrics::{ContainerMetrics, PodMetrics, Resource},
+        metrics::{ContainerMetrics, FunctionMetric, PodMetrics, Resource},
         Labels,
     },
 };
@@ -21,7 +24,7 @@ use super::response::HandlerResult;
 use crate::AppState;
 
 #[debug_handler]
-pub async fn list(
+pub async fn list_pods(
     Extension(app_state): Extension<Arc<AppState>>,
     query: Query<ListQuery>,
 ) -> HandlerResult<Vec<PodMetrics>> {
@@ -53,7 +56,6 @@ pub async fn list(
         ) by(container_label_minik8s_container_name, container_label_minik8s_pod_name)",
         selector_str
     )));
-    tracing::info!("{:?}", query);
     let response = DataSourceBuilder::new(&app_state.config.metrics_server)
         .with_query(query)
         .build()
@@ -126,6 +128,43 @@ pub async fn list(
         })
         .collect::<Vec<_>>();
     Ok(Json(Response::new(None, Some(metrics))))
+}
+
+#[debug_handler]
+pub async fn get_function(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Path(func_name): Path<String>,
+) -> HandlerResult<FunctionMetric> {
+    let query = PromQuery::Instant(InstantQuery::new(&format!(
+        "idelta(\
+            function_requests_total{{\
+                function=\"{}\"\
+            }}[1m]\
+        )",
+        func_name
+    )));
+    let response = DataSourceBuilder::new(&app_state.config.metrics_server)
+        .with_query(query)
+        .build()
+        .unwrap()
+        .get()
+        .await;
+    let metrics = unwrap_vector_result(response)?;
+    if metrics.is_empty() {
+        return Err(ErrResponse::new(
+            String::from("Failed to get metrics"),
+            Some(String::from("No metrics found")),
+        ));
+    }
+    let value = unwrap_instant_value(metrics[0].to_owned().value)?;
+    Ok(Json(Response::new(
+        None,
+        Some(FunctionMetric {
+            name: func_name,
+            timestamp: Local::now().naive_utc(),
+            value: value.1 as i64,
+        }),
+    )))
 }
 
 fn unwrap_vector_result(

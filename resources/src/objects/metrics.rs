@@ -39,3 +39,11 @@ pub struct PodMetric {
 
 /// A mapping from pod names to metrics.
 pub type PodMetricsInfo = HashMap<String, PodMetric>;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct FunctionMetric {
+    /// Function name
+    pub name: String,
+    pub timestamp: NaiveDateTime,
+    pub value: i64,
+}

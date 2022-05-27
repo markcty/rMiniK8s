@@ -184,7 +184,8 @@ async fn main() -> Result<()> {
     let metrics_routes = Router::new().nest(
         "/metrics",
         Router::new()
-            .route("/pods", get(handler::metrics::list))
+            .route("/pods", get(handler::metrics::list_pods))
+            .route("/functions/:name", get(handler::metrics::get_function))
     );
 
     // tmp file server
