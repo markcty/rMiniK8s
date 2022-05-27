@@ -18,9 +18,7 @@ if [ ! -f /usr/local/bin/flanneld ]; then
 else
   printf "flanneld installed\n\n"
 fi
-if [ ! -f /etc/systemd/system/flanneld.service ]; then
-  wget -q --show-progress -O /etc/systemd/system/flanneld.service https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/flanneld.service
-fi
+cp ./flanneld.service /etc/systemd/system/flanneld.service
 printf "flanneld service installed\n\n"
 
 # start etcd
@@ -80,9 +78,7 @@ printf "control plane started\n\n"
 printf "Installing rkube-proxy ...\n"
 wget -q --show-progress -O /usr/local/bin/rkube-proxy http://minik8s.xyz:8008/rkube-proxy
 chmod +x /usr/local/bin/rkube-proxy
-if [ ! -f /etc/systemd/system/rkubeproxy.service ]; then
-  wget -q --show-progress -O /etc/systemd/system/rkubeproxy.service http://minik8s.xyz:8008/rkubeproxy.service
-fi
+cp ./rkubeproxy.service /etc/systemd/system/rkubeproxy.service
 printf "ETCD_ENDPOINT=$ETCD_ENDPOINT\nAPI_SERVER_ENDPOINT=http://${API_SERVER_IP}:8080\n" > /etc/rminik8s/node.env
 systemctl daemon-reload
 systemctl restart rkubeproxy.service
