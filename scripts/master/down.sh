@@ -7,6 +7,8 @@ export PROMETHEUS_IP=${SUBNET_BASE}.103
 export ETCD_ENDPOINT=http://${IP}:2379
 set -a; source /run/flannel/subnet.env; set +a
 
+printf "nameserver 119.29.29.29\n" > /etc/resolv.conf
+
 docker-compose down -t 1 -v --remove-orphans 
 docker rm -f etcd
 docker rm -f dns
