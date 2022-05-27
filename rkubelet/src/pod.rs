@@ -409,9 +409,13 @@ impl Pod {
         containers: &[ContainerStatus],
     ) -> HashMap<PodConditionType, PodCondition> {
         let mut conditions = self.status.conditions.to_owned();
-        let containers_ready = containers
+        // Make sure running container count equals that in spec,
+        // in case no pod container remains
+        let ready_count = containers
             .iter()
-            .all(|status| status.state == ContainerState::Running);
+            .map(|status| (status.state == ContainerState::Running) as u32)
+            .sum::<u32>();
+        let containers_ready = ready_count == self.spec.containers.len() as u32;
         conditions.insert(
             PodConditionType::ContainersReady,
             PodCondition {
