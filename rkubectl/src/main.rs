@@ -61,6 +61,7 @@ enum ResourceKind {
     HorizontalPodAutoscalers,
     GpuJobs,
     Nodes,
+    Functions,
 }
 
 fn main() -> Result<()> {

@@ -32,12 +32,12 @@ async fn route(
         let func_store = func_store.read().await;
         let (key, func) = func_store
             .iter()
-            .find(|(_, func)| func.spec.host == host)
+            .find(|(_, func)| func.status.as_ref().unwrap().host == host)
             .ok_or_else(|| anyhow!("No such function matching host: {}", host))?;
         func_key = key.to_owned();
         func_name = func.metadata.name.to_owned();
 
-        svc_key = func.spec.service_ref.clone();
+        svc_key = func.status.as_ref().unwrap().service_ref.clone();
         let svc = get_svc(&svc_key, svc_store.to_owned()).await?;
         need_activate = svc.spec.endpoints.is_empty();
     }

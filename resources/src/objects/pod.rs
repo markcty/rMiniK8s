@@ -618,7 +618,14 @@ impl PodTemplateSpec {
         let spec = PodSpec {
             containers: vec![Container {
                 name: func_name,
-                image: func.status.image.as_ref().unwrap().to_owned(),
+                image: func
+                    .status
+                    .as_ref()
+                    .unwrap()
+                    .image
+                    .as_ref()
+                    .unwrap()
+                    .to_owned(),
                 image_pull_policy: Some(ImagePullPolicy::IfNotPresent),
                 ports: vec![ContainerPort {
                     container_port: 80,

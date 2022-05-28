@@ -26,30 +26,10 @@ pub async fn create(
         let name = field.name().map_or("".to_string(), |n| n.to_owned());
         match name.as_str() {
             "job" => {
-                gpu_job = Some(
-                    serde_json::from_str(
-                        field
-                            .text()
-                            .await
-                            .map_err(|_| {
-                                ErrResponse::bad_request("Invalid field".to_string(), None)
-                            })?
-                            .as_str(),
-                    )
-                    .map_err(|_| {
-                        ErrResponse::bad_request("Failed to deserialize".to_string(), None)
-                    })?,
-                );
+                gpu_job = Some(decode_field_json(field).await?);
             },
             "code" => {
-                let original_filename = field.file_name().map_or("".to_string(), |n| n.to_owned());
-                if !original_filename.ends_with(".zip") {
-                    let err =
-                        ErrResponse::bad_request("Please upload a zip file".to_string(), None);
-                    return Err(err);
-                }
-
-                filename = Some(stream_to_tmp_file(original_filename.as_str(), field).await?);
+                filename = Some(store_code_file(field).await?);
             },
             _ => {},
         }

@@ -10,10 +10,10 @@ use crate::{objects::KubeObject, utils::gen_url};
 
 #[derive(Args)]
 pub struct Arg {
+    /// The definition YAML file of the resource to create
     #[clap(short, long, parse(from_os_str), value_name = "FILE")]
     file: PathBuf,
-    #[clap(long, parse(from_flag))]
-    job: bool,
+    /// ZIP code file to upload, required when creating jobs and functions
     #[clap(short, long, parse(from_os_str), value_name = "ZIP")]
     code_file: Option<PathBuf>,
 }
@@ -25,16 +25,18 @@ impl Arg {
             File::open(path).with_context(|| format!("Failed to open file {}", path.display()))?;
         let object: KubeObject = serde_yaml::from_reader(file)
             .with_context(|| format!("Failed to parse file {}", path.display()))?;
-        let msg: String = if self.job {
-            let code_path = self
-                .code_file
-                .to_owned()
-                .ok_or_else(|| anyhow!("Code file is not provided"))?;
-            create_job(&object, code_path)
-                .with_context(|| format!("Failed to create using file {}", path.display()))?
-        } else {
-            create(&object)
-                .with_context(|| format!("Failed to create using file {}", path.display()))?
+        let msg: String = match object {
+            KubeObject::GpuJob(..) | KubeObject::Function(..) => {
+                let code_path = self
+                    .code_file
+                    .to_owned()
+                    .ok_or_else(|| anyhow!("Code file is not provided"))?;
+                create_with_file(&object, code_path).with_context(|| {
+                    format!("Failed to create job using file {}", path.display())
+                })?
+            },
+            _ => create(&object)
+                .with_context(|| format!("Failed to create using file {}", path.display()))?,
         };
 
         println!("{}", msg);
@@ -52,11 +54,14 @@ fn create(object: &KubeObject) -> Result<String> {
     }
 }
 
-fn create_job(object: &KubeObject, file: PathBuf) -> Result<String> {
+fn create_with_file(object: &KubeObject, file: PathBuf) -> Result<String> {
     let client = reqwest::blocking::Client::new();
     let url = gen_url(object.kind_plural(), None)?;
     let form = multipart::Form::new()
-        .text("job", serde_json::to_string(&object)?)
+        .text(
+            object.kind().to_lowercase(),
+            serde_json::to_string(&object)?,
+        )
         .file("code", file)?;
     let res = client
         .post(url)

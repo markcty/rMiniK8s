@@ -1,6 +1,6 @@
 use std::{io, net::Ipv4Addr, path::PathBuf, sync::Arc};
 
-use axum::{body::Bytes, BoxError};
+use axum::{body::Bytes, extract::multipart::Field, BoxError};
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
 use futures::{Stream, TryStreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -209,4 +209,25 @@ where
     }
     .await
     .map_err(|err| ErrResponse::new(err.to_string(), None))
+}
+
+pub async fn decode_field_json(field: Field<'_>) -> Result<KubeObject, ErrResponse> {
+    serde_json::from_str(
+        field
+            .text()
+            .await
+            .map_err(|_| ErrResponse::bad_request("Invalid field".to_string(), None))?
+            .as_str(),
+    )
+    .map_err(|_| ErrResponse::bad_request("Failed to deserialize".to_string(), None))
+}
+
+pub async fn store_code_file(field: Field<'_>) -> Result<String, ErrResponse> {
+    let original_filename = field.file_name().map_or("".to_string(), |n| n.to_owned());
+    if !original_filename.ends_with(".zip") {
+        let err = ErrResponse::bad_request("Please upload a zip file".to_string(), None);
+        return Err(err);
+    }
+
+    stream_to_tmp_file(original_filename.as_str(), field).await
 }

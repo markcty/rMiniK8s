@@ -37,15 +37,12 @@ impl HorizontalPodAutoscaler {
         let spec = HorizontalPodAutoscalerSpec {
             scale_target_ref: ObjectReference {
                 kind: "ReplicaSet".to_string(),
-                name: func_name.to_owned(),
-            },
-            behavior: HorizontalPodAutoscalerBehavior::default(),
-            min_replicas: 0,
-            max_replicas: 10,
-            metrics: MetricSource::Function(FunctionMetricSource {
                 name: func_name,
-                target: 30,
-            }),
+            },
+            behavior: func.spec.behavior.to_owned(),
+            min_replicas: 0,
+            max_replicas: func.spec.max_replicas,
+            metrics: func.spec.metrics.to_owned(),
         };
         Self {
             metadata,

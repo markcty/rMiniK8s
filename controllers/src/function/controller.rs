@@ -77,21 +77,19 @@ impl FunctionController {
 
     async fn handle_function_add(&mut self, mut func: Function) -> Result<()> {
         tracing::info!("New function: {}", func.metadata.name);
-        self.build_function_image(&mut func).await?;
+        let image_name = self.build_function_image(&mut func).await?;
+        func.status.as_mut().unwrap().image = Some(image_name);
+        self.post_status(&func).await?;
+
         self.create_replica_set(&func).await?;
         self.create_hpa(&func).await?;
         Ok(())
     }
 
-    async fn build_function_image(&self, func: &mut Function) -> Result<()> {
+    async fn build_function_image(&self, func: &mut Function) -> Result<String> {
         self.prepare_file(func).await?;
         let image_name = self.build_image(func).await?;
-
-        func.status.image = Some(image_name);
-
-        self.post_status(func).await?;
-
-        Ok(())
+        Ok(image_name)
     }
 
     async fn prepare_file(&self, func: &Function) -> Result<()> {
@@ -100,7 +98,7 @@ impl FunctionController {
         // unzip
         Command::new("unzip")
             .current_dir(&func_dir_path)
-            .args(["-o", func.spec.filename.as_str()])
+            .args(["-o", func.status.as_ref().unwrap().filename.as_str()])
             .output()?;
         // copy templates
         let mut copy_option = CopyOptions::new();
@@ -112,7 +110,7 @@ impl FunctionController {
 
     async fn fetch_code(&self, func: &Function) -> Result<()> {
         let client = reqwest::Client::new();
-        let filename = func.spec.filename.to_owned();
+        let filename = func.status.as_ref().unwrap().filename.to_owned();
         let response = client
             .get(format!("{}/api/v1/tmp/{}", CONFIG.api_server_url, filename))
             .send()

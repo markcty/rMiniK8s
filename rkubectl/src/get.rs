@@ -8,7 +8,8 @@ use resources::{
     objects::{
         node::NodeAddressType,
         KubeObject::{
-            self, GpuJob, HorizontalPodAutoscaler, Ingress, Node, Pod, ReplicaSet, Service,
+            self, Function, GpuJob, HorizontalPodAutoscaler, Ingress, Node, Pod, ReplicaSet,
+            Service,
         },
     },
 };
@@ -207,6 +208,51 @@ impl Arg {
                                 .addresses
                                 .get(&NodeAddressType::InternalIP)
                                 .unwrap_or(&"".to_string())
+                        );
+                    }
+                }
+            },
+            ResourceKind::Functions => {
+                println!(
+                    "{:<16} {:<10} {:<8} {:<8} {:<8}",
+                    "NAME", "STATUS", "CURRENT", "DESIRED", "LAST SCALE"
+                );
+                for object in data {
+                    if let Function(func) = object {
+                        let status = func.status.expect("Function has no status");
+
+                        // Query HPA
+                        let url = gen_url(
+                            "horizontalpodautoscalers".to_string(),
+                            Some(&func.metadata.name),
+                        )?;
+                        let res = client.get(url).send()?.json::<Response<KubeObject>>()?;
+                        let hpa_status = if let HorizontalPodAutoscaler(hpa) =
+                            res.data.expect("Failed to get HPA")
+                        {
+                            hpa.status.expect("HPA has no status")
+                        } else {
+                            continue;
+                        };
+
+                        let state = if status.image.is_none() {
+                            "Pending"
+                        } else if hpa_status.current_replicas > 0 {
+                            "Ready"
+                        } else {
+                            "Hibernated"
+                        };
+
+                        println!(
+                            "{:<16} {:<10} {:<8} {:<8} {:<8}",
+                            func.metadata.name,
+                            state,
+                            hpa_status.current_replicas,
+                            hpa_status.desired_replicas,
+                            hpa_status
+                                .last_scale_time
+                                .map(calc_age)
+                                .unwrap_or_else(|| "Never".to_string())
                         );
                     }
                 }
