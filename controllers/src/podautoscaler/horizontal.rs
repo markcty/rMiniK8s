@@ -173,7 +173,15 @@ impl PodAutoscaler {
                         });
                 }
 
-                if current_replicas != status.current_replicas {
+                // ReplicaSet might have been modified by serverless router
+                if current_replicas != status.desired_replicas {
+                    self.recommendations
+                        .entry(hpa_name.to_owned())
+                        .or_insert_with(LinkedList::new)
+                        .push_back(Recommendation {
+                            replicas: current_replicas,
+                            time: now,
+                        });
                     self.record_scale_event(
                         hpa_name,
                         &hpa.spec.behavior,
@@ -184,6 +192,7 @@ impl PodAutoscaler {
 
                 let desired_replicas = if current_replicas == 0 {
                     // Scaling disabled
+                    tracing::info!("Scaling disabled for {}", hpa_name);
                     0
                 } else if current_replicas > hpa.spec.max_replicas {
                     hpa.spec.max_replicas
@@ -226,7 +235,11 @@ impl PodAutoscaler {
                     );
                 }
                 let new_status = HorizontalPodAutoscalerStatus {
-                    current_replicas,
+                    current_replicas: if desired_replicas == 0 {
+                        0
+                    } else {
+                        current_replicas
+                    },
                     desired_replicas,
                     last_scale_time: if current_replicas != desired_replicas {
                         Some(now)
