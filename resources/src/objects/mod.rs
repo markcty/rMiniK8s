@@ -18,6 +18,7 @@ pub mod object_reference;
 pub mod pod;
 pub mod replica_set;
 pub mod service;
+pub mod workflow;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[enum_dispatch(Object)]
@@ -32,6 +33,7 @@ pub enum KubeObject {
     HorizontalPodAutoscaler(hpa::HorizontalPodAutoscaler),
     GpuJob(gpu_job::GpuJob),
     Function(function::Function),
+    Workflow(workflow::Workflow),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
