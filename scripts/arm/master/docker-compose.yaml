@@ -1,0 +1,114 @@
+version: "3"
+
+services:
+  api_server:
+    image: minik8s.xyz/api_server-arm:latest
+    container_name: api_server
+    ports:
+      - "8080:8080"
+    environment:
+      - "ETCD_ENDPOINT=${ETCD_ENDPOINT}"
+      - "METRICS_SERVER=prometheus:9090"
+    depends_on:
+      - prometheus
+    networks:
+      default:
+        ipv4_address: "$API_SERVER_IP"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command: --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+    networks:
+      default:
+        ipv4_address: "$PROMETHEUS_IP"
+
+  endpoints-controller:
+    image: minik8s.xyz/endpoints-controller-arm:latest
+    container_name: endpoints-controller
+    environment:
+      - API_SERVER_ENDPOINT=http://api_server:8080
+    depends_on:
+      - api_server
+
+  ingress-controller:
+    image: minik8s.xyz/ingress-controller-arm:latest
+    container_name: ingress
+    environment:
+      - API_SERVER_ENDPOINT=http://api_server:8080
+    depends_on:
+      - api_server
+    networks:
+      default:
+        ipv4_address: "$INGRESS_IP"
+
+  replicaset-controller:
+    image: minik8s.xyz/replicaset-controller-arm:latest
+    container_name: replicaset-controller
+    environment:
+      - API_SERVER_URL=http://api_server:8080
+      - API_SERVER_WATCH_URL=ws://api_server:8080
+    depends_on:
+      - api_server
+
+  # cadvisor:
+  #   image: zcube/cadvisor:latest
+  #   container_name: cadvisor
+  #   ports:
+  #     - "8090:8080"
+  #   volumes:
+  #     - /:/rootfs:ro
+  #     - /var/run:/var/run:rw
+  #     - /sys:/sys:ro
+  #     - /var/lib/docker/:/var/lib/docker:ro
+
+  function-controller:
+    image: minik8s.xyz/function-controller-arm:latest
+    container_name: function-controller
+    environment:
+      - API_SERVER_URL=http://api_server:8080
+      - API_SERVER_WATCH_URL=ws://api_server:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - api_server
+
+  serverless-router:
+    image: minik8s.xyz/serverless-router-arm:latest
+    container_name: serverless-router
+    environment:
+      - API_SERVER_ENDPOINT=http://api_server:8080
+    depends_on:
+      - api_server
+    networks:
+      default:
+        ipv4_address: "$SERVERLESS_ROUTER_IP"
+
+  podautoscaler:
+    image: minik8s.xyz/podautoscaler-arm:latest
+    container_name: podautoscaler
+    environment:
+      - API_SERVER_URL=http://api_server:8080
+      - API_SERVER_WATCH_URL=ws://api_server:8080
+    depends_on:
+      - api_server
+
+  gpujob_controller:
+    image: minik8s.xyz/gpujob-controller-arm:latest
+    container_name: gpujob-controller
+    environment:
+      - API_SERVER_URL=http://api_server:8080
+      - API_SERVER_WATCH_URL=ws://api_server:8080
+      - USERNAME=stu607
+      - PASSWORD=JP^L75kq
+    depends_on:
+      - api_server
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: "${FLANNEL_SUBNET}"

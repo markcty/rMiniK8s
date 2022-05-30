@@ -17,11 +17,12 @@ use resources::{
         Labels,
     },
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use tokio::fs;
 
 use super::response::HandlerResult;
-use crate::AppState;
+use crate::{AppState, METRICS_SERVER_CONFIG};
 
 #[debug_handler]
 pub async fn list_pods(
@@ -167,6 +168,43 @@ pub async fn get_function(
     )))
 }
 
+#[debug_handler]
+pub async fn add_target(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(payload): Json<HashMap<String, String>>,
+) -> HandlerResult<()> {
+    match (payload.get("job"), payload.get("target")) {
+        (Some(job), Some(target)) => {
+            add_scrape_target(job, target.to_owned(), &app_state.config.metrics_server).await?;
+            Ok(Json(Response::new(Some("target added".to_string()), None)))
+        },
+        _ => Err(ErrResponse::new(
+            String::from("Failed to add target"),
+            Some(String::from("Missing job or target")),
+        )),
+    }
+}
+
+#[debug_handler]
+pub async fn remove_target(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Json(payload): Json<HashMap<String, String>>,
+) -> HandlerResult<()> {
+    match (payload.get("job"), payload.get("target")) {
+        (Some(job), Some(target)) => {
+            remove_scrape_target(job, target.to_owned(), &app_state.config.metrics_server).await?;
+            Ok(Json(Response::new(
+                Some("target removed".to_string()),
+                None,
+            )))
+        },
+        _ => Err(ErrResponse::new(
+            String::from("Failed to remove target"),
+            Some(String::from("Missing job or target")),
+        )),
+    }
+}
+
 fn unwrap_vector_result(
     response: Result<PromResponse, DataSourceError>,
 ) -> Result<Vec<VectorResult>, ErrResponse> {
@@ -231,7 +269,152 @@ fn get_selector_str(selector: &Labels) -> String {
         + ","
 }
 
+pub async fn read_config() -> Result<PromConfig, ErrResponse> {
+    let file = fs::read_to_string(METRICS_SERVER_CONFIG)
+        .await
+        .map_err(|err| {
+            tracing::error!("Failed to read metrics server config file: {}", err);
+            ErrResponse::new(
+                "Failed to read metrics server config file".to_string(),
+                None,
+            )
+        })?;
+    let config: PromConfig = serde_yaml::from_str(&file).map_err(|err| {
+        tracing::error!("Failed to parse metrics server config file: {}", err);
+        ErrResponse::new(
+            "Failed to parse metrics server config file".to_string(),
+            None,
+        )
+    })?;
+    Ok(config)
+}
+
+pub async fn write_config(config: PromConfig) -> Result<(), ErrResponse> {
+    let contents = serde_yaml::to_string(&config).map_err(|err| {
+        tracing::error!("Failed to serialize metrics server config file: {}", err);
+        ErrResponse::new(
+            "Failed to serialize metrics server config".to_string(),
+            None,
+        )
+    })?;
+    fs::write(METRICS_SERVER_CONFIG, contents)
+        .await
+        .map_err(|err| {
+            tracing::error!("Failed to write metrics server config file: {}", err);
+            ErrResponse::new("Failed to write metrics server config".to_string(), None)
+        })
+}
+
+pub async fn reload_config(metrics_server: &str) -> Result<(), ErrResponse> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/-/reload", metrics_server).as_str())
+        .send()
+        .await
+        .map_err(|err| {
+            ErrResponse::new(
+                String::from("Failed to reload metrics server config"),
+                Some(err.to_string()),
+            )
+        })?;
+    if let Ok(text) = response.text().await {
+        if !text.is_empty() {
+            tracing::error!("{}", text);
+            return Err(ErrResponse::new(
+                String::from("Failed to reload metrics server config"),
+                Some(text),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Add a scrape target to a job in Prometheus, then reload the config.
+pub async fn add_scrape_target(
+    job_name: &str,
+    target: String,
+    metrics_server: &str,
+) -> Result<(), ErrResponse> {
+    let mut config = read_config().await?;
+    // Add target
+    if let Some(config) = config
+        .scrape_configs
+        .iter_mut()
+        .find(|config| config.job_name == job_name)
+    {
+        // Job exists
+        if !config.static_configs[0]
+            .targets
+            .iter()
+            .any(|t| *t == target)
+        {
+            // Target doesn't exist
+            config.static_configs[0].targets.push(target);
+        }
+    } else {
+        // Job does not exist
+        config.scrape_configs.push(PromScrapeConfig {
+            job_name: job_name.to_string(),
+            scrape_interval: Some("15s".to_string()),
+            static_configs: vec![PromStaticConfig {
+                targets: vec![target],
+            }],
+        });
+    }
+    write_config(config).await?;
+    reload_config(metrics_server).await
+}
+
+/// Remove a scrape target from a job in Prometheus, then reload the config.
+pub async fn remove_scrape_target(
+    job_name: &str,
+    target: String,
+    metrics_server: &str,
+) -> Result<(), ErrResponse> {
+    let mut config = read_config().await?;
+    // Remove target
+    if let Some(config) = config
+        .scrape_configs
+        .iter_mut()
+        .find(|config| config.job_name == job_name)
+    {
+        if let Some(index) = config.static_configs[0]
+            .targets
+            .iter()
+            .position(|t| *t == target)
+        {
+            config.static_configs[0].targets.remove(index);
+        }
+    }
+    write_config(config).await?;
+    reload_config(metrics_server).await
+}
+
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub selector: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PromGlobalConfig {
+    pub scrape_interval: Option<String>,
+    pub external_labels: HashMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PromStaticConfig {
+    pub targets: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PromScrapeConfig {
+    pub job_name: String,
+    pub scrape_interval: Option<String>,
+    pub static_configs: Vec<PromStaticConfig>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PromConfig {
+    pub global: PromGlobalConfig,
+    pub scrape_configs: Vec<PromScrapeConfig>,
 }

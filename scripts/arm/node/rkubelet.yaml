@@ -1,0 +1,8 @@
+#staticPodPath: "/etc/rminik8s/manifests"
+#node_status_update_frequency: 10
+#node_status_report_frequency: 30
+#pod_status_update_frequency: 10
+#port: 10250
+cluster:
+  apiServerUrl: "http://${MASTER_IP}:8080"
+  apiServerWatchUrl: "ws://${MASTER_IP}:8080"

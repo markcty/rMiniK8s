@@ -4,7 +4,7 @@ name = "dummy"
 version = "0.1.0"
 
 [patch.crates-io]
-bollard = {git = 'https://github.com/y-young/bollard'}
+bollard = {git = 'https://hub.fastgit.xyz/y-young/bollard'}
 
 [dependencies]
 anyhow = {version = "1.0.56", features = ["backtrace"]}

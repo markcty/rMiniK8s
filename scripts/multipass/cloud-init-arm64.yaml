@@ -1,0 +1,27 @@
+#cloud-config
+package_upgrade: true
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+# create the docker group
+groups:
+  - docker
+
+apt:
+  primary:
+    - arches: [default]
+      uri: http://mirror.sjtu.edu.cn/ubuntu-ports/
+
+system_info:
+  default_user:
+    groups: [docker]
+
+runcmd:
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - echo "deb [arch=$(dpkg --print-architecture)] https://mirror.sjtu.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-compose zip etcd-client tmux httpie

@@ -68,8 +68,8 @@ impl NodeStatusManager {
 
     async fn register_node(&mut self) {
         let client = reqwest::Client::new();
-        let payload = self.object();
         self.status = self.get_status();
+        let payload = self.object();
         const MAX_BACKOFF: u64 = 20;
         let mut backoff = 2;
 
@@ -132,11 +132,11 @@ impl NodeStatusManager {
                     .iter()
                     .filter(|i| !i.is_loopback() && i.is_up() && i.is_running())
                     .for_each(|i| {
-                        tracing::debug!("{:#?}", i);
                         i.addresses.iter().for_each(|addr| {
                             if let Some(addr) = addr.addr {
+                                tracing::debug!("{:#?}", i);
                                 let ip = addr.ip();
-                                if ip.is_ipv4() {
+                                if ip.is_ipv4() && i.name.starts_with("en") {
                                     addresses.insert(NodeAddressType::InternalIP, ip.to_string());
                                 }
                             }

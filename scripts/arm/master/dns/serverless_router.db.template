@@ -1,0 +1,2 @@
+minik8s.com.        IN  SOA dns.minik8s.com. email.minik8s.com. 2015082541 7200 3600 1209600 3600
+*    IN  A   ${SERVERLESS_ROUTER_IP}

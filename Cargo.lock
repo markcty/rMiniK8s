@@ -81,9 +81,11 @@ dependencies = [
  "lazy_static 1.4.0",
  "prometheus-http-api",
  "rand",
+ "reqwest",
  "resources",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tokio",
  "tokio-util",
  "tower-http",
@@ -399,7 +401,7 @@ dependencies = [
 [[package]]
 name = "bollard"
 version = "0.12.0"
-source = "git+https://github.com/y-young/bollard#43ac334abfd547132f4ff48efd99f0bb93a5145e"
+source = "git+https://hub.fastgit.xyz/y-young/bollard#43ac334abfd547132f4ff48efd99f0bb93a5145e"
 dependencies = [
  "base64",
  "bollard-stubs",

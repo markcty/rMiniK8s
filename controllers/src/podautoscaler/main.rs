@@ -12,7 +12,14 @@ mod utils;
 
 lazy_static! {
     pub static ref CONFIG: ClusterConfig = Config::builder()
-        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml"))
+        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml").required(false))
+        .set_override_option("apiServerUrl", std::env::var("API_SERVER_URL").ok())
+        .unwrap()
+        .set_override_option(
+            "apiServerWatchUrl",
+            std::env::var("API_SERVER_WATCH_URL").ok(),
+        )
+        .unwrap()
         .build()
         .unwrap_or_default()
         .try_deserialize::<ClusterConfig>()

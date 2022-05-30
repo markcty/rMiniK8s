@@ -55,7 +55,11 @@ fn create(object: &KubeObject) -> Result<String> {
 }
 
 fn create_with_file(object: &KubeObject, file: PathBuf) -> Result<String> {
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .pool_idle_timeout(None)
+        .timeout(None)
+        .connect_timeout(None)
+        .build()?;
     let url = gen_url(object.kind_plural(), None)?;
     let form = multipart::Form::new()
         .text(

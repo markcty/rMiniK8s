@@ -8,18 +8,13 @@ use futures::{
     SinkExt, StreamExt,
 };
 use resources::{models::etcd::WatchEvent, objects::Object};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 pub type EtcdPool = managed::Pool<EtcdManager>;
 pub type EtcdClient = managed::Object<EtcdManager>;
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct EtcdConfig {
-    url: String,
-}
-
 pub struct EtcdManager {
-    url: String,
+    endpoint: String,
 }
 
 pub struct EtcdError {
@@ -28,9 +23,9 @@ pub struct EtcdError {
 }
 
 impl EtcdManager {
-    fn from_config(config: &EtcdConfig) -> EtcdManager {
+    fn new(endpoint: &str) -> EtcdManager {
         EtcdManager {
-            url: config.url.to_owned(),
+            endpoint: endpoint.to_owned(),
         }
     }
 }
@@ -41,20 +36,12 @@ impl managed::Manager for EtcdManager {
     type Error = etcd_client::Error;
 
     async fn create(&self) -> core::result::Result<Self::Type, Self::Error> {
-        let client = Client::connect([self.url.to_owned()], None).await?;
+        let client = Client::connect([self.endpoint.to_owned()], None).await?;
         Ok(client)
     }
 
     async fn recycle(&self, _: &mut Self::Type) -> managed::RecycleResult<Self::Error> {
         Ok(())
-    }
-}
-
-impl EtcdConfig {
-    pub async fn create_pool(&self) -> anyhow::Result<EtcdPool> {
-        let manager = EtcdManager::from_config(self);
-        let pool = managed::Pool::builder(manager).build()?;
-        Ok(pool)
     }
 }
 
@@ -206,4 +193,10 @@ pub fn kv_to_str(kv: &KeyValue) -> Result<(String, String)> {
         })?,
     );
     Ok((key_str.to_string(), val_str.to_string()))
+}
+
+pub fn create_etcd_pool(etcd_endpoint: &str) -> anyhow::Result<EtcdPool> {
+    let manager = EtcdManager::new(etcd_endpoint);
+    let pool = managed::Pool::builder(manager).build()?;
+    Ok(pool)
 }

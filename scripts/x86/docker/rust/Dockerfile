@@ -6,3 +6,4 @@ COPY ./config.toml /.cargo/config.toml
 COPY ./dummy /root/dummy
 WORKDIR /root/dummy
 RUN cargo fetch
+WORKDIR /project

@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use anyhow::{Context, Result};
-use config::{Config, File};
+use config::{Config, Environment, File};
 use controller::GpuJobController;
 use resources::config::ClusterConfig;
 use serde::{Deserialize, Serialize};
@@ -22,14 +22,22 @@ pub struct ServerConfig {
 
 lazy_static! {
     pub static ref CONFIG: ClusterConfig = Config::builder()
-        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml"))
+        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml").required(false))
+        .set_override_option("apiServerUrl", std::env::var("API_SERVER_URL").ok())
+        .unwrap()
+        .set_override_option(
+            "apiServerWatchUrl",
+            std::env::var("API_SERVER_WATCH_URL").ok(),
+        )
+        .unwrap()
         .build()
         .unwrap_or_default()
         .try_deserialize::<ClusterConfig>()
         .with_context(|| "Failed to parse config".to_string())
         .unwrap_or_default();
     pub static ref GPU_SERVER_CONFIG: ServerConfig = Config::builder()
-        .add_source(File::with_name("/etc/rminik8s/gpuserver-config.yaml"))
+        .add_source(File::with_name("/etc/rminik8s/gpuserver-config.yaml").required(false))
+        .add_source(Environment::default())
         .build()
         .unwrap_or_default()
         .try_deserialize::<ServerConfig>()

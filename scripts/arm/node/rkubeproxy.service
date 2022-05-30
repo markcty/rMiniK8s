@@ -1,0 +1,12 @@
+[Unit]
+Description=rKubeProxy
+After=network-online.target firewalld.service containerd.service time-set.target flanneld.service
+
+[Service]
+EnvironmentFile=/etc/rminik8s/node.env
+ExecStart=/usr/local/bin/rkube-proxy
+Restart=on-failure
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target

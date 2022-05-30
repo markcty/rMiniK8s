@@ -11,7 +11,7 @@ mod controller;
 mod utils;
 
 const TMP_DIR: &str = "/tmp/minik8s/function";
-const TEMPLATES_DIR: &str = "./templates/function_wrapper";
+const TEMPLATES_DIR: &str = "/templates/function_wrapper";
 const DOCKER_REGISTRY: &str = "minik8s.xyz";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -22,7 +22,14 @@ pub struct ServerConfig {
 
 lazy_static! {
     pub static ref CONFIG: ClusterConfig = Config::builder()
-        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml"))
+        .add_source(File::with_name("/etc/rminik8s/controller-manager.yaml").required(false))
+        .set_override_option("apiServerUrl", std::env::var("API_SERVER_URL").ok())
+        .unwrap()
+        .set_override_option(
+            "apiServerWatchUrl",
+            std::env::var("API_SERVER_WATCH_URL").ok(),
+        )
+        .unwrap()
         .build()
         .unwrap_or_default()
         .try_deserialize::<ClusterConfig>()

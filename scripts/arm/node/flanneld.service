@@ -6,6 +6,8 @@ Before=kdocker.service
 [Service]
 EnvironmentFile=/etc/rminik8s/conf.env
 ExecStart=/usr/local/bin/flanneld --etcd-endpoints=${ETCD_ENDPOINT}
+Restart=on-failure
+RestartSec=3s
 
 [Install]
 WantedBy=multi-user.target

@@ -8,7 +8,7 @@ use axum::{
 use axum_macros::debug_handler;
 use resources::{
     models::{ErrResponse, Response},
-    objects::{KubeObject, Object},
+    objects::{node::NodeAddressType, KubeObject, Object},
 };
 use uuid::Uuid;
 
@@ -18,7 +18,10 @@ use super::{
 };
 use crate::{
     etcd::forward_watch_to_ws,
-    handler::utils::{etcd_delete, etcd_get_object, etcd_put},
+    handler::{
+        metrics::{add_scrape_target, remove_scrape_target},
+        utils::{etcd_delete, etcd_get_object, etcd_put},
+    },
     AppState,
 };
 
@@ -68,6 +71,16 @@ pub async fn update(
             },
             _ => {
                 node.metadata.uid = Some(Uuid::new_v4());
+                if let Some(internal_ip) = node.status.addresses.get(&NodeAddressType::InternalIP) {
+                    add_scrape_target(
+                        "cadvisor",
+                        format!("{}:8090", internal_ip),
+                        &app_state.config.metrics_server,
+                    )
+                    .await?;
+                } else {
+                    tracing::warn!("Node has no internal IP, cannot scrape cadvisor");
+                }
             },
         }
         etcd_put(&app_state, &payload).await?;
@@ -86,7 +99,23 @@ pub async fn delete(
     Extension(app_state): Extension<Arc<AppState>>,
     Path(node_name): Path<String>,
 ) -> HandlerResult<()> {
+    let node = etcd_get_object(
+        &app_state,
+        format!("/api/v1/nodes/{}", node_name),
+        Some("node"),
+    )
+    .await?;
     etcd_delete(&app_state, format!("/api/v1/nodes/{}", node_name)).await?;
+    if let KubeObject::Node(node) = node {
+        if let Some(internal_ip) = node.status.addresses.get(&NodeAddressType::InternalIP) {
+            remove_scrape_target(
+                "cadvisor",
+                format!("{}:8090", internal_ip),
+                &app_state.config.metrics_server,
+            )
+            .await?;
+        }
+    }
     let res = Response::new(Some(format!("node/{} deleted", node_name)), None);
     Ok(Json(res))
 }

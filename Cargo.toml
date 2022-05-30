@@ -11,4 +11,4 @@ members = [
 ]
 
 [patch.crates-io]
-bollard = {git = 'https://github.com/y-young/bollard'}
+bollard = {git = 'https://hub.fastgit.xyz/y-young/bollard'}

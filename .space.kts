@@ -59,16 +59,16 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/docker/api_server/Dockerfile"
+            file = "./scripts/x86/docker/api_server/Dockerfile"
         }
-        push("minik8s.xyz/api_server") {
+        push("minik8s.xyz/x86/api_server") {
             tags("latest")
         }
     }
 
     docker {
         build {
-            file = "./scripts/docker/endpoints-controller/Dockerfile"
+            file = "./scripts/x86/docker/endpoints-controller/Dockerfile"
         }
         push("minik8s.xyz/endpoints-controller") {
             tags("latest")
@@ -77,7 +77,7 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/docker/ingress-controller/Dockerfile"
+            file = "./scripts/x86/docker/ingress-controller/Dockerfile"
         }
         push("minik8s.xyz/ingress-controller") {
             tags("latest")
@@ -86,7 +86,7 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/docker/podautoscaler/Dockerfile"
+            file = "./scripts/x86/docker/podautoscaler/Dockerfile"
         }
         push("minik8s.xyz/podautoscaler") {
             tags("latest")
@@ -95,7 +95,7 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/docker/replicaset-controller/Dockerfile"
+            file = "./scripts/x86/docker/replicaset-controller/Dockerfile"
         }
         push("minik8s.xyz/replicaset-controller") {
             tags("latest")
@@ -104,7 +104,7 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/docker/rkubelet/Dockerfile"
+            file = "./scripts/x86/docker/rkubelet/Dockerfile"
         }
         push("minik8s.xyz/rkubelet") {
             tags("latest")
@@ -113,7 +113,7 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/docker/scheduler/Dockerfile"
+            file = "./scripts/x86/docker/scheduler/Dockerfile"
         }
         push("minik8s.xyz/scheduler") {
             tags("latest")
