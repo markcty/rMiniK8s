@@ -1,6 +1,7 @@
 use std::{collections::HashMap, default::Default};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use super::{Metadata, Object};
 
@@ -42,7 +43,6 @@ impl Object for Workflow {
 pub enum State {
     Task(Task),
     Choice(Choice),
-    Fail(Fail),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -57,7 +57,7 @@ pub struct Task {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Choice {
-    pub choices: Vec<ChoiceRule>,
+    pub rules: Vec<ChoiceRule>,
     pub default: String,
 }
 
@@ -75,7 +75,34 @@ pub enum Comparison {
     FieldNumEquals { field: String, content: i32 },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Fail {
-    pub msg: String,
+impl ChoiceRule {
+    pub fn match_with(&self, text: &str) -> bool {
+        let args: serde_json::Map<String, Value> = serde_json::from_str(text).unwrap();
+        match self.comparison {
+            Comparison::FieldEquals {
+                ref field,
+                ref content,
+            } => {
+                if let Some(Value::String(v)) = args.get(field) {
+                    v == content
+                } else {
+                    false
+                }
+            },
+            Comparison::FieldNumEquals {
+                ref field,
+                ref content,
+            } => {
+                if let Some(Value::Number(v)) = args.get(field) {
+                    if let Some(v) = v.as_i64() {
+                        v == *content as i64
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+        }
+    }
 }

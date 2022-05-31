@@ -14,7 +14,7 @@ spec:
       next: guess
     guess:
       type: Choice
-      choices:
+      rules:
         - type: FieldNumEquals
           field: ans
           content: 10
@@ -26,6 +26,3 @@ spec:
     wrong:
       type: Task
       resource: wrong
-    fail:
-      type: Fail
-      msg: "Something went wrong..."

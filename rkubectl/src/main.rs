@@ -13,7 +13,6 @@ mod create;
 mod delete;
 mod describe;
 mod get;
-mod invoke;
 mod patch;
 mod utils;
 
@@ -50,8 +49,6 @@ enum Commands {
     Patch(patch::Arg),
     /// Describe a resource,
     Describe(describe::Arg),
-    /// Invoke a function workflow
-    Invoke(invoke::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -76,7 +73,6 @@ fn main() -> Result<()> {
         Commands::Get(arg) => arg.handle()?,
         Commands::Patch(arg) => arg.handle()?,
         Commands::Describe(arg) => arg.handle()?,
-        Commands::Invoke(arg) => arg.handle()?,
     }
 
     Ok(())

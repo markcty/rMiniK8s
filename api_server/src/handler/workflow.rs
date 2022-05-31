@@ -46,7 +46,7 @@ async fn validate_workflow(app_state: &Arc<AppState>, workflow: &Workflow) -> Re
         if let State::Task(task) = state {
             if etcd_get_object(
                 app_state,
-                format!("api/v1/functions/{}", task.resource),
+                format!("/api/v1/functions/{}", task.resource),
                 Some("function"),
             )
             .await

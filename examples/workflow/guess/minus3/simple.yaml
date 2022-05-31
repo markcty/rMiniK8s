@@ -1,9 +1,9 @@
 kind: Function
 metadata:
-  name: minus
+  name: minus3
 spec:
   maxReplicas: 10
   metrics:
     type: Function
-    name: minus
+    name: minus3
     target: 30
