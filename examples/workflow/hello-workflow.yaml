@@ -11,8 +11,14 @@ spec:
     choiceState:
       type: Choice
       choices:
-        - { stringEquals: hello, next: FirstMatchState }
-        - { stringEquals: hello!, next: SecondMatchState }
+        - type: FieldEquals
+          field: ans
+          content: "8"
+          next: FirstMatchState
+        - type: FieldNumEquals
+          field: ans
+          content: 8
+          next: secondMatchState
       default: DefaultState
     firstMatchState:
       type: Task

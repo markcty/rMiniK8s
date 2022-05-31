@@ -5,7 +5,6 @@ use anyhow::{Context, Result};
 use config::{Config, File};
 use controller::FunctionController;
 use resources::config::ClusterConfig;
-use serde::{Deserialize, Serialize};
 
 mod controller;
 mod utils;
@@ -13,12 +12,6 @@ mod utils;
 const TMP_DIR: &str = "/tmp/minik8s/function";
 const TEMPLATES_DIR: &str = "/templates/function_wrapper";
 const DOCKER_REGISTRY: &str = "minik8s.xyz";
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ServerConfig {
-    pub username: String,
-    pub password: String,
-}
 
 lazy_static! {
     pub static ref CONFIG: ClusterConfig = Config::builder()
@@ -40,6 +33,7 @@ lazy_static! {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+    println!("api_server_url: {}", CONFIG.api_server_url);
 
     let mut controller = FunctionController::new();
     controller.run().await?;

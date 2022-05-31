@@ -171,6 +171,7 @@ async fn main() -> Result<()> {
             .route("/functions/:name", get(handler::function::watch_one)),
     );
 
+    #[rustfmt::skip]
     let function_routes = Router::new().nest(
         "/functions",
         Router::new()
@@ -199,6 +200,22 @@ async fn main() -> Result<()> {
             )
     );
 
+    #[rustfmt::skip]
+    let workflow_routes = Router::new().nest(
+        "/workflows",
+        Router::new()
+            .route(
+                "/",
+                post(handler::workflow::create),
+            )
+            .route(
+                "/:name",
+                get(handler::workflow::get)
+                    .put(handler::workflow::update)
+                    .delete(handler::workflow::delete),
+            ),
+    );
+
     // tmp file server
     fs::create_dir_all(TMP_DIR).await?;
     let tmp_file_service = get_service(ServeDir::new(TMP_DIR)).handle_error(|error| async move {
@@ -222,6 +239,7 @@ async fn main() -> Result<()> {
                 .merge(node_routes)
                 .merge(gpujob_routes)
                 .merge(function_routes)
+                .merge(workflow_routes)
                 .nest("/tmp", tmp_file_service)
                 .route("/bindings", post(handler::binding::bind)),
         )

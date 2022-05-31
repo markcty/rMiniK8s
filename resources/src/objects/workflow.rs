@@ -1,4 +1,4 @@
-use std::default::Default;
+use std::{collections::HashMap, default::Default};
 
 use serde::{Deserialize, Serialize};
 
@@ -15,16 +15,16 @@ pub struct Workflow {
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowSpec {
     /// A string that must exactly match (is case sensitive) the name of one of the state objects.
-    start_at: String,
+    pub start_at: String,
     /// An object containing a comma-delimited set of states.
-    states: Vec<State>,
+    pub states: HashMap<String, State>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStatus {
-    current_state: String,
-    current_result: String,
+    pub current_state: String,
+    pub current_result: String,
 }
 
 impl Object for Workflow {
@@ -47,42 +47,35 @@ pub enum State {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Task {
-    /// Name of the Task
-    name: String,
     /// Identifies the specific function to excute.
-    resource: String,
+    pub resource: String,
     /// The next field that is run when the task state is complete.
     /// If it's None, the state will end the execution.
     #[serde(default)]
-    next: Option<String>,
+    pub next: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Choice {
-    choices: Vec<ChoiceRule>,
-    default: String,
+    pub choices: Vec<ChoiceRule>,
+    pub default: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ChoiceRule {
-    name: String,
-    comparison: Comparison,
-    next: String,
+    #[serde(flatten)]
+    pub comparison: Comparison,
+    pub next: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(tag = "type")]
 pub enum Comparison {
-    StringEquals(String),
+    FieldEquals { field: String, content: String },
+    FieldNumEquals { field: String, content: i32 },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Fail {
-    name: String,
-    error: StateError,
-    cause: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum StateError {
-    DefaultStateError,
+    pub msg: String,
 }

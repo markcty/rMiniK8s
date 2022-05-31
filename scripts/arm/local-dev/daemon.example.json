@@ -1,0 +1,6 @@
+{
+  "registry-mirrors": [
+    "https://docker.mirrors.sjtug.sjtu.edu.cn"
+  ],
+  "bip": "$FLANNEL_SUBNET"
+}

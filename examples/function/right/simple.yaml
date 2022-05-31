@@ -1,0 +1,9 @@
+kind: Function
+metadata:
+  name: right
+spec:
+  maxReplicas: 10
+  metrics:
+    type: Function
+    name: right
+    target: 30
