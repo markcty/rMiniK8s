@@ -2,7 +2,7 @@ use std::vec::Vec;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Args;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use resources::{
     models::Response,
     objects::{
@@ -29,17 +29,24 @@ pub struct Arg {
 }
 
 impl Arg {
-    pub fn handle(&self) -> Result<()> {
+    pub async fn handle(&self) -> Result<()> {
         let client = Client::new();
         let url = gen_url(self.kind.to_string(), self.name.as_ref())?;
         let data = if self.name.is_none() {
             let res = client
                 .get(url)
-                .send()?
-                .json::<Response<Vec<KubeObject>>>()?;
+                .send()
+                .await?
+                .json::<Response<Vec<KubeObject>>>()
+                .await?;
             res.data.unwrap_or_default()
         } else {
-            let res = client.get(url).send()?.json::<Response<KubeObject>>()?;
+            let res = client
+                .get(url)
+                .send()
+                .await?
+                .json::<Response<KubeObject>>()
+                .await?;
             res.data.map_or_else(Vec::new, |data| vec![data])
         };
 
@@ -226,7 +233,12 @@ impl Arg {
                             "horizontalpodautoscalers".to_string(),
                             Some(&func.metadata.name),
                         )?;
-                        let res = client.get(url).send()?.json::<Response<KubeObject>>()?;
+                        let res = client
+                            .get(url)
+                            .send()
+                            .await?
+                            .json::<Response<KubeObject>>()
+                            .await?;
                         let hpa_status = if let HorizontalPodAutoscaler(hpa) =
                             res.data.expect("Failed to get HPA")
                         {

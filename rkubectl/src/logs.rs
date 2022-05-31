@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Args;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use resources::models::{ErrResponse, Response};
 use serde::Deserialize;
 
@@ -18,7 +18,7 @@ pub struct Arg {
 }
 
 impl Arg {
-    pub fn handle(&self) -> Result<()> {
+    pub async fn handle(&self) -> Result<()> {
         let client = Client::new();
         let base_url = gen_url("pods".to_string(), Some(&self.pod_name))?;
         let url = match self.container_name {
@@ -28,8 +28,10 @@ impl Arg {
         let res = client
             .get(url)
             .query(&[("tail", &self.tail.as_ref().unwrap_or(&"all".to_string()))])
-            .send()?
-            .json::<LogsResponse>()?;
+            .send()
+            .await?
+            .json::<LogsResponse>()
+            .await?;
         match res {
             LogsResponse::Ok(res) => print!("{}", res.data.unwrap_or_default()),
             LogsResponse::Err(res) => println!("{}: {}", res.msg, res.cause.unwrap_or_default()),

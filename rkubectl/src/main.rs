@@ -67,16 +67,17 @@ enum ResourceKind {
     Functions,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Create(arg) => arg.handle()?,
-        Commands::Delete(arg) => arg.handle()?,
-        Commands::Get(arg) => arg.handle()?,
-        Commands::Patch(arg) => arg.handle()?,
-        Commands::Describe(arg) => arg.handle()?,
-        Commands::Logs(arg) => arg.handle()?,
+        Commands::Create(arg) => arg.handle().await?,
+        Commands::Delete(arg) => arg.handle().await?,
+        Commands::Get(arg) => arg.handle().await?,
+        Commands::Patch(arg) => arg.handle().await?,
+        Commands::Describe(arg) => arg.handle().await?,
+        Commands::Logs(arg) => arg.handle().await?,
     }
 
     Ok(())

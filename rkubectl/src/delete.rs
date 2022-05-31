@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Args;
+use reqwest::Client;
 use serde::Deserialize;
 
 use crate::{utils::gen_url, ResourceKind};
@@ -14,10 +15,10 @@ pub struct Arg {
 }
 
 impl Arg {
-    pub fn handle(&self) -> Result<()> {
-        let client = reqwest::blocking::Client::new();
+    pub async fn handle(&self) -> Result<()> {
+        let client = Client::new();
         let url = gen_url(self.kind.to_string(), Some(&self.name))?;
-        let res = client.delete(url).send()?.json::<DeleteRes>()?;
+        let res = client.delete(url).send().await?.json::<DeleteRes>().await?;
         println!("{}", res.msg);
         Ok(())
     }
