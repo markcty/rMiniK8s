@@ -10,6 +10,7 @@ path = "src/router/main.rs"
 [dependencies]
 anyhow = {version = "1.0.56", features = ["backtrace"]}
 dotenv = "0.15.0"
+futures = "0.3.21"
 hyper = "0.14.18"
 lazy_static = "1.4.0"
 nginx-config = "0.13.2"

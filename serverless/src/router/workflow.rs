@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use futures::future::join_all;
 use hyper::Body;
 use ordinal::Ordinal;
 use reqwest::Client;
@@ -11,10 +12,12 @@ use resources::{
     },
 };
 
-use crate::CONFIG;
+use crate::{route::activate_rs, CONFIG};
 
 pub async fn handle_workflow(name: &str, init_args: String) -> Result<hyper::Response<Body>> {
     let workflow = get_workflow(name).await?;
+
+    optimize_workflow(&workflow).await?;
 
     // walk the flow
     let mut next = workflow
@@ -109,6 +112,17 @@ pub async fn handle_workflow(name: &str, init_args: String) -> Result<hyper::Res
     }
 
     Ok(hyper::Response::new(Body::from(final_res)))
+}
+
+async fn optimize_workflow(workflow: &Workflow) -> Result<()> {
+    let mut activations = vec![];
+    for (_, state) in workflow.spec.states.iter() {
+        if let State::Task(task) = state {
+            activations.push(activate_rs(task.resource.as_str()));
+        }
+    }
+    join_all(activations).await;
+    Ok(())
 }
 
 async fn get_workflow(name: &str) -> Result<Workflow> {

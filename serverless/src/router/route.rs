@@ -100,7 +100,7 @@ async fn get_svc(svc_key: &str, svc_store: Store<Service>) -> Result<Service> {
     Ok(svc.to_owned())
 }
 
-async fn activate_rs(rs_name: &str) -> Result<()> {
+pub async fn activate_rs(rs_name: &str) -> Result<()> {
     let client = reqwest::Client::new();
     let url = format!(
         "{}api/v1/replicasets/{}",
@@ -135,7 +135,7 @@ async fn activate_rs(rs_name: &str) -> Result<()> {
 
 async fn activate(func_name: &str, svc_key: String, svc_store: Store<Service>) -> Result<()> {
     tracing::info!("Function {} has no instance, activating...", func_name);
-    // TODO: create hpa or ...
+
     activate_rs(func_name).await?;
 
     let mut i = 0;
