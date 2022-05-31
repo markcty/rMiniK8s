@@ -19,6 +19,7 @@ use resources::{
     },
     utils::first_error_or_ok,
 };
+use uuid::Uuid;
 
 use crate::{
     config::{CONTAINER_NAME_PREFIX, PAUSE_IMAGE_NAME, POD_DIR_PATH, SANDBOX_NAME},
@@ -143,7 +144,7 @@ impl Pod {
             labels: Some(labels),
             ..Default::default()
         };
-        let name = Some(self.unique_container_name(&container.name));
+        let name = Some(self.get_container_name(&container.name));
         Container::create(name, config).await
     }
 
@@ -189,7 +190,7 @@ impl Pod {
             labels: Some(labels),
             ..Default::default()
         };
-        let name = Some(self.unique_container_name(SANDBOX_NAME));
+        let name = Some(self.get_container_name(SANDBOX_NAME));
         let container = Container::create(name, config).await?;
         container.start().await?;
         Ok(container)
@@ -197,7 +198,7 @@ impl Pod {
 
     // Start a pod container, create it if doesn't exist
     async fn start_container(&self, container: &pod::Container, sandbox: &Container) -> Result<()> {
-        let old_container = Container::new(self.unique_container_name(&container.name));
+        let old_container = Container::new(self.get_container_name(&container.name));
         let result = old_container.inspect().await?;
         let container = match result {
             Some(_) => old_container,
@@ -322,23 +323,27 @@ impl Pod {
         Ok(Some(binds))
     }
 
-    fn unique_container_name(&self, container_name: &str) -> String {
+    fn get_container_name(&self, container_name: &str) -> String {
         let uid = self.metadata.uid.expect("Pod with no uid");
+        Pod::unique_container_name(&uid, &self.metadata.name, container_name)
+    }
+
+    pub fn unique_container_name(uid: &Uuid, pod_name: &str, container_name: &str) -> String {
         format!(
             "{}_{}_{}_{}",
-            CONTAINER_NAME_PREFIX, container_name, self.metadata.name, uid
+            CONTAINER_NAME_PREFIX, container_name, pod_name, uid
         )
     }
 
     fn sandbox(&self) -> Container {
-        Container::new(self.unique_container_name(SANDBOX_NAME))
+        Container::new(self.get_container_name(SANDBOX_NAME))
     }
 
     fn containers(&self) -> Vec<Container> {
         self.spec
             .containers
             .iter()
-            .map(|container| Container::new(self.unique_container_name(&container.name)))
+            .map(|container| Container::new(self.get_container_name(&container.name)))
             .collect()
     }
 

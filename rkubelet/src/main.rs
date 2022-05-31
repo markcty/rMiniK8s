@@ -1,9 +1,10 @@
 use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Error, Result};
+use axum::{routing::get, Extension, Router};
 use reqwest::Url;
 use resources::{
-    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, WsStream},
+    informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store, WsStream},
     models::Response,
     objects::pod::Pod,
 };
@@ -15,6 +16,7 @@ use crate::{
     pod_worker::PodWorker, status_manager::StatusManager,
 };
 
+mod api;
 mod config;
 mod docker;
 mod models;
@@ -28,6 +30,10 @@ pub type PodList = Arc<RwLock<HashSet<String>>>;
 
 #[derive(Debug)]
 pub struct ResyncNotification;
+
+pub struct AppState {
+    pod_store: Store<Pod>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -107,11 +113,32 @@ async fn main() -> Result<()> {
     let mut pod_worker = PodWorker::new(pods.clone(), pod_store.clone(), tx, resync_rx);
     let pod_worker_handle = tokio::spawn(async move { pod_worker.run(rx).await });
 
-    let mut status_manager = StatusManager::new(pods, pod_store);
+    let mut status_manager = StatusManager::new(pods, pod_store.clone());
     let status_manager_handle = tokio::spawn(async move { status_manager.run().await });
 
     let mut node_status_manager = NodeStatusManager::new();
     let node_status_manager_handle = tokio::spawn(async move { node_status_manager.run().await });
+
+    // Configure and start rkubelet API server
+    let app_state = Arc::new(AppState {
+        pod_store,
+    });
+
+    let app = Router::new()
+        .nest(
+            "/api/v1/pods/:pod_name",
+            Router::new()
+                .route("/logs", get(api::pod_logs))
+                .route("/containers/:container_name/logs", get(api::container_logs)),
+        )
+        .layer(Extension(app_state));
+
+    let addr = format!("0.0.0.0:{}", config::CONFIG.port);
+    tracing::info!("Listening at {}", addr);
+    axum::Server::bind(&addr.parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     node_status_manager_handle.await??;
     status_manager_handle.await??;

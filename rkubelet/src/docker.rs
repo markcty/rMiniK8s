@@ -2,11 +2,12 @@ use std::{cmp::Eq, collections::HashMap, default::Default, hash::Hash};
 
 use anyhow::{Context, Result};
 use bollard::{
-    container::{Config, CreateContainerOptions, StartContainerOptions},
+    container::{Config, CreateContainerOptions, LogsOptions, StartContainerOptions},
     errors::Error::DockerResponseServerError,
     image::{CreateImageOptions, ListImagesOptions},
     models::ContainerInspectResponse,
 };
+use chrono::Utc;
 use futures::{future::join_all, StreamExt};
 use resources::objects::pod::{ContainerStatus, ImagePullPolicy};
 use serde::Serialize;
@@ -176,6 +177,39 @@ impl Container {
                 Err(err).with_context(|| format!("Failed to inspect container {}", self.id))
             },
         }
+    }
+
+    pub async fn logs(&self, tail: &Option<String>) -> Result<String> {
+        let tail = tail.to_owned().unwrap_or_else(|| "all".to_string());
+        let mut stream = DOCKER.logs(
+            self.id.as_str(),
+            Some(LogsOptions {
+                stdout: true,
+                stderr: true,
+                tail,
+                until: Utc::now().timestamp(),
+                ..Default::default()
+            }),
+        );
+        let mut logs = String::new();
+        while let Some(log) = stream.next().await {
+            match log {
+                Ok(log) => {
+                    let log = log.into_bytes();
+                    match std::str::from_utf8(&log) {
+                        Ok(log) => logs += log,
+                        Err(err) => {
+                            tracing::error!("{:#}", err);
+                        },
+                    }
+                },
+                Err(err) => {
+                    tracing::error!("{:#}", err);
+                    return Err(anyhow::anyhow!("Failed to get logs: {:#}", err));
+                },
+            }
+        }
+        Ok(logs)
     }
 }
 

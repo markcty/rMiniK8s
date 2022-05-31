@@ -2286,6 +2286,8 @@ name = "rkubelet"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
+ "axum-macros",
  "bollard",
  "chrono",
  "clap",
