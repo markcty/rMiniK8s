@@ -78,6 +78,7 @@ dependencies = [
  "deadpool",
  "etcd-client",
  "futures",
+ "hyper",
  "lazy_static 1.4.0",
  "prometheus-http-api",
  "rand",

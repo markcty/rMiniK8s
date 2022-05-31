@@ -23,6 +23,16 @@ impl Object for Node {
     }
 }
 
+impl Node {
+    pub fn internal_ip(&self) -> Option<String> {
+        self.status
+            .addresses
+            .iter()
+            .find(|(type_, _)| NodeAddressType::InternalIP.eq(type_))
+            .map(|(_, ip)| ip.to_owned())
+    }
+}
+
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:<16} {}", "Name:", self.metadata.name)?;

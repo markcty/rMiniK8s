@@ -57,6 +57,9 @@ impl ErrResponse {
             status: StatusCode::BAD_REQUEST,
         }
     }
+    pub fn json(&self) -> String {
+        serde_json::to_string::<Self>(self).unwrap()
+    }
 }
 
 impl IntoResponse for ErrResponse {

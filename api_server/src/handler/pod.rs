@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, WebSocketUpgrade},
+    extract::{OriginalUri, Path, WebSocketUpgrade},
+    http::Request,
     response::IntoResponse,
     Extension, Json,
 };
 use axum_macros::debug_handler;
+use hyper::Body;
 use resources::{
     models::{ErrResponse, Response},
     objects::{pod::PodPhase, KubeObject, Object},
@@ -114,4 +116,24 @@ pub async fn watch_all(
     Ok(ws.on_upgrade(|socket| async move {
         forward_watch_to_ws::<KubeObject>(socket, watcher, stream).await
     }))
+}
+
+#[debug_handler]
+pub async fn pod_logs(
+    Extension(app_state): Extension<Arc<AppState>>,
+    OriginalUri(uri): OriginalUri,
+    Path(pod_name): Path<String>,
+    request: Request<Body>,
+) -> axum::http::Response<Body> {
+    proxy_to_rkubelet(app_state, uri, pod_name, request).await
+}
+
+#[debug_handler]
+pub async fn container_logs(
+    Extension(app_state): Extension<Arc<AppState>>,
+    OriginalUri(uri): OriginalUri,
+    Path((pod_name, _)): Path<(String, String)>,
+    request: Request<Body>,
+) -> axum::http::Response<Body> {
+    proxy_to_rkubelet(app_state, uri, pod_name, request).await
 }

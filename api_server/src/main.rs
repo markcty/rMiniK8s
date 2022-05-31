@@ -61,10 +61,16 @@ async fn main() -> Result<()> {
             .route("/",
                    get(handler::pod::list)
                        .post(handler::pod::create))
-            .route("/:name",
-                   get(handler::pod::get)
-                       .put(handler::pod::replace)
-                       .delete(handler::pod::delete),
+            .nest("/:name",
+                Router::new()
+                    .route("/",
+                    get(handler::pod::get)
+                        .put(handler::pod::replace)
+                        .delete(handler::pod::delete))
+                    .route("/logs",
+                        get(handler::pod::pod_logs))
+                    .route("/containers/:container_name/logs",
+                           get(handler::pod::container_logs))
             ),
     );
 

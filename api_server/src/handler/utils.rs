@@ -1,12 +1,19 @@
 use std::{io, net::Ipv4Addr, path::PathBuf, sync::Arc};
 
-use axum::{body::Bytes, extract::multipart::Field, BoxError};
+use axum::{
+    body::Bytes,
+    extract::multipart::Field,
+    http::{Request, Uri},
+    BoxError,
+};
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
 use futures::{Stream, TryStreamExt};
+use hyper::{client::HttpConnector, Body, Client};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use resources::{
+    config::kubelet::KubeletConfig,
     models::ErrResponse,
-    objects::{KubeObject, Object},
+    objects::{node::Node, pod::Pod, KubeObject, Object},
 };
 use tokio::{fs::File, io::BufWriter};
 use tokio_util::io::StreamReader;
@@ -230,4 +237,69 @@ pub async fn store_code_file(field: Field<'_>) -> Result<String, ErrResponse> {
     }
 
     stream_to_tmp_file(original_filename.as_str(), field).await
+}
+
+pub async fn get_pod_node(app_state: &Arc<AppState>, pod: &Pod) -> Option<Node> {
+    let node_name = pod.spec.node_name.as_ref();
+    match node_name {
+        Some(node_name) => {
+            let node_object = etcd_get_object(
+                app_state,
+                format!("/api/v1/nodes/{}", node_name),
+                Some("node"),
+            )
+            .await;
+            match node_object {
+                Ok(KubeObject::Node(node)) => Some(node),
+                _ => None,
+            }
+        },
+        None => None,
+    }
+}
+
+/// Proxy request to rKubelet on the pod's node
+pub async fn proxy_to_rkubelet(
+    app_state: Arc<AppState>,
+    uri: Uri,
+    pod_name: String,
+    mut request: Request<Body>,
+) -> axum::http::Response<Body> {
+    let pod_object = etcd_get_object(
+        &app_state,
+        format!("/api/v1/pods/{}", pod_name),
+        Some("pod"),
+    )
+    .await;
+    match pod_object {
+        Ok(KubeObject::Pod(pod)) => {
+            let node = get_pod_node(&app_state, &pod).await;
+            let node_ip = node
+                .as_ref()
+                .and_then(|node| node.internal_ip())
+                .unwrap_or_else(|| "127.0.0.1".to_string());
+            let kubelet_port = node.map_or(KubeletConfig::default().port, |node| {
+                node.status.kubelet_port
+            });
+
+            let path = uri.path();
+            let path_query = uri.path_and_query().map(|v| v.as_str()).unwrap_or(path);
+            tracing::debug!("Proxying request to {}", path_query);
+            let uri = format!("http://{}:{}{}", node_ip, kubelet_port, path_query);
+            *request.uri_mut() = Uri::try_from(uri).unwrap();
+            let client = Client::<HttpConnector, Body>::new();
+            client.request(request).await.unwrap_or_else(|e| {
+                axum::http::Response::new(Body::from(
+                    ErrResponse::new(
+                        String::from("Failed to connect to rKubelet"),
+                        Some(e.to_string()),
+                    )
+                    .json(),
+                ))
+            })
+        },
+        _ => axum::http::Response::new(Body::from(
+            ErrResponse::new(String::from("Pod not found"), None).json(),
+        )),
+    }
 }

@@ -13,6 +13,7 @@ mod create;
 mod delete;
 mod describe;
 mod get;
+mod logs;
 mod patch;
 mod utils;
 
@@ -43,12 +44,14 @@ enum Commands {
     Create(create::Arg),
     /// Delete a resource by name.
     Delete(delete::Arg),
-    /// Get resources
+    /// Get resources list.
     Get(get::Arg),
-    /// Patch a resource
+    /// Patch a resource.
     Patch(patch::Arg),
-    /// Describe a resource,
+    /// Describe a resource.
     Describe(describe::Arg),
+    /// Print pod container logs.
+    Logs(logs::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -73,6 +76,7 @@ fn main() -> Result<()> {
         Commands::Get(arg) => arg.handle()?,
         Commands::Patch(arg) => arg.handle()?,
         Commands::Describe(arg) => arg.handle()?,
+        Commands::Logs(arg) => arg.handle()?,
     }
 
     Ok(())
