@@ -12,6 +12,7 @@ use strum::Display;
 mod create;
 mod delete;
 mod describe;
+mod exec;
 mod get;
 mod logs;
 mod patch;
@@ -52,6 +53,8 @@ enum Commands {
     Describe(describe::Arg),
     /// Print pod container logs.
     Logs(logs::Arg),
+    /// Execute commands in a pod container.
+    Exec(exec::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -78,6 +81,7 @@ async fn main() -> Result<()> {
         Commands::Patch(arg) => arg.handle().await?,
         Commands::Describe(arg) => arg.handle().await?,
         Commands::Logs(arg) => arg.handle().await?,
+        Commands::Exec(arg) => arg.handle().await?,
     }
 
     Ok(())
