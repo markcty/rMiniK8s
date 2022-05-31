@@ -1,16 +1,18 @@
-use std::{cmp::Eq, collections::HashMap, default::Default, hash::Hash};
+use std::{cmp::Eq, collections::HashMap, default::Default, hash::Hash, pin::Pin};
 
 use anyhow::{Context, Result};
 use bollard::{
     container::{Config, CreateContainerOptions, LogsOptions, StartContainerOptions},
     errors::Error::DockerResponseServerError,
+    exec::{CreateExecOptions, StartExecResults},
     image::{CreateImageOptions, ListImagesOptions},
     models::ContainerInspectResponse,
 };
 use chrono::Utc;
-use futures::{future::join_all, StreamExt};
+use futures::{future::join_all, Stream, StreamExt};
 use resources::objects::pod::{ContainerStatus, ImagePullPolicy};
 use serde::Serialize;
+use tokio::io::AsyncWrite;
 
 use crate::config::DOCKER;
 
@@ -210,6 +212,43 @@ impl Container {
             }
         }
         Ok(logs)
+    }
+
+    pub async fn exec(
+        &self,
+        command: &str,
+    ) -> Result<(
+        Pin<
+            Box<
+                dyn Stream<Item = Result<bollard::container::LogOutput, bollard::errors::Error>>
+                    + Send,
+            >,
+        >,
+        Pin<Box<dyn AsyncWrite + Send>>,
+    )> {
+        let exec = DOCKER
+            .create_exec(
+                self.id.as_str(),
+                CreateExecOptions {
+                    cmd: Some(command.split(' ').collect()),
+                    attach_stdout: Some(true),
+                    attach_stderr: Some(true),
+                    attach_stdin: Some(true),
+                    tty: Some(true),
+                    ..Default::default()
+                },
+            )
+            .await?
+            .id;
+        if let StartExecResults::Attached {
+            output,
+            input,
+        } = DOCKER.start_exec(&exec, None).await?
+        {
+            Ok((output, input))
+        } else {
+            Err(anyhow::anyhow!("Failed to start exec"))
+        }
     }
 }
 

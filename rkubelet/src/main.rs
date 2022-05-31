@@ -127,9 +127,12 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .nest(
             "/api/v1/pods/:pod_name",
-            Router::new()
-                .route("/logs", get(api::pod_logs))
-                .route("/containers/:container_name/logs", get(api::container_logs)),
+            Router::new().route("/logs", get(api::pod_logs)).nest(
+                "/containers/:container_name",
+                Router::new()
+                    .route("/logs", get(api::container_logs))
+                    .route("/exec", get(api::container_exec)),
+            ),
         )
         .layer(Extension(app_state));
 
