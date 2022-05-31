@@ -2,10 +2,7 @@ use std::{fs::File, path::PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Args;
-use reqwest::{
-    multipart::{self, Part},
-    Client,
-};
+use reqwest::blocking::multipart;
 use resources::objects::Object;
 use serde::Deserialize;
 
@@ -29,18 +26,16 @@ impl Arg {
         let object: KubeObject = serde_yaml::from_reader(file)
             .with_context(|| format!("Failed to parse file {}", path.display()))?;
         let msg: String = match object {
-            KubeObject::GpuJob(..) | KubeObject::Function(..) => {
+            KubeObject::Function(..) => {
                 let code_path = self
                     .code_file
                     .to_owned()
                     .ok_or_else(|| anyhow!("Code file is not provided"))?;
-                create_with_file(&object, code_path)
-                    .await
-                    .with_context(|| format!("Failed to create using file {}", path.display()))?
+                update_with_file(&object, code_path)
+                    .with_context(|| format!("Failed to update using file {}", path.display()))?
             },
-            _ => create(&object)
-                .await
-                .with_context(|| format!("Failed to create using file {}", path.display()))?,
+            _ => update(&object)
+                .with_context(|| format!("Failed to update using file {}", path.display()))?,
         };
 
         println!("{}", msg);
@@ -48,34 +43,30 @@ impl Arg {
     }
 }
 
-async fn create(object: &KubeObject) -> Result<String> {
-    let client = Client::new();
+fn update(object: &KubeObject) -> Result<String> {
+    let client = reqwest::blocking::Client::new();
     let url = gen_url(object.kind_plural(), None)?;
-    let res = client
-        .post(url)
-        .json(&object)
-        .send()
-        .await?
-        .json::<CreateRes>()
-        .await?;
+    let res = client.put(url).json(&object).send()?.json::<UpdateRes>()?;
     match res.cause {
         Some(cause) => Err(anyhow::anyhow!("{}: {}", res.msg, cause)),
         None => Ok(res.msg),
     }
 }
 
-async fn create_with_file(object: &KubeObject, path: PathBuf) -> Result<String> {
-    let client = Client::builder().pool_idle_timeout(None).build()?;
+fn update_with_file(object: &KubeObject, file: PathBuf) -> Result<String> {
+    let client = reqwest::blocking::Client::builder()
+        .pool_idle_timeout(None)
+        .timeout(None)
+        .connect_timeout(None)
+        .build()?;
     let url = gen_url(object.kind_plural(), None)?;
 
-    // Load file as a part
-    let bytes = std::fs::read(&path)?;
-    let mut file = Part::bytes(bytes);
-    if let Some(file_name) = path
-        .file_name()
-        .map(|filename| filename.to_string_lossy().into_owned())
-    {
-        file = file.file_name(file_name);
+    let res = client
+        .delete(gen_url(object.kind_plural(), Some(object.name()))?)
+        .send()?
+        .json::<UpdateRes>()?;
+    if let Some(cause) = res.cause {
+        return Err(anyhow::anyhow!("{}: {}", res.msg, cause));
     }
 
     let form = multipart::Form::new()
@@ -83,14 +74,12 @@ async fn create_with_file(object: &KubeObject, path: PathBuf) -> Result<String> 
             object.kind().to_lowercase(),
             serde_json::to_string(&object)?,
         )
-        .part("code", file);
+        .file("code", file)?;
     let res = client
         .post(url)
         .multipart(form)
-        .send()
-        .await?
-        .json::<CreateRes>()
-        .await?;
+        .send()?
+        .json::<UpdateRes>()?;
     match res.cause {
         Some(cause) => Err(anyhow::anyhow!("{}: {}", res.msg, cause)),
         None => Ok(res.msg),
@@ -98,7 +87,7 @@ async fn create_with_file(object: &KubeObject, path: PathBuf) -> Result<String> 
 }
 
 #[derive(Debug, Deserialize)]
-struct CreateRes {
+struct UpdateRes {
     msg: String,
     cause: Option<String>,
 }

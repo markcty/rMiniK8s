@@ -17,6 +17,7 @@ mod exec;
 mod get;
 mod logs;
 mod patch;
+mod update;
 mod utils;
 
 struct AppConfig {
@@ -60,6 +61,8 @@ enum Commands {
     ///
     /// Usage: echo 'source <(rkubectl completion bash)' >> ~/.bashrc
     Completion(completion::Arg),
+    /// Update a resource
+    Update(update::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -89,6 +92,7 @@ async fn main() -> Result<()> {
         Commands::Logs(arg) => arg.handle().await?,
         Commands::Exec(arg) => arg.handle().await?,
         Commands::Completion(arg) => arg.handle(&mut Cli::command()).await?,
+        Commands::Update(arg) => arg.handle().await?,
     }
 
     Ok(())
