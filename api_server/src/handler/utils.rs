@@ -2,12 +2,17 @@ use std::{io, net::Ipv4Addr, path::PathBuf, sync::Arc};
 
 use axum::{
     body::Bytes,
-    extract::multipart::Field,
+    extract::{
+        multipart::Field,
+        ws::{CloseFrame, Message},
+        WebSocketUpgrade,
+    },
     http::{Request, Uri},
+    response::IntoResponse,
     BoxError,
 };
 use etcd_client::{GetOptions, GetResponse, WatchOptions, WatchStream, Watcher};
-use futures::{Stream, TryStreamExt};
+use futures::{SinkExt, Stream, StreamExt, TryStreamExt};
 use hyper::{client::HttpConnector, Body, Client};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use resources::{
@@ -16,6 +21,7 @@ use resources::{
     objects::{node::Node, pod::Pod, KubeObject, Object},
 };
 use tokio::{fs::File, io::BufWriter};
+use tokio_tungstenite::{connect_async, tungstenite as ts};
 use tokio_util::io::StreamReader;
 
 use crate::{
@@ -258,13 +264,11 @@ pub async fn get_pod_node(app_state: &Arc<AppState>, pod: &Pod) -> Option<Node> 
     }
 }
 
-/// Proxy request to rKubelet on the pod's node
-pub async fn proxy_to_rkubelet(
+/// Get rKubelet addr of the pod's node
+pub async fn pod_node_rkubelet_addr(
     app_state: Arc<AppState>,
-    uri: Uri,
     pod_name: String,
-    mut request: Request<Body>,
-) -> axum::http::Response<Body> {
+) -> Result<String, ErrResponse> {
     let pod_object = etcd_get_object(
         &app_state,
         format!("/api/v1/pods/{}", pod_name),
@@ -281,11 +285,26 @@ pub async fn proxy_to_rkubelet(
             let kubelet_port = node.map_or(KubeletConfig::default().port, |node| {
                 node.status.kubelet_port
             });
+            Ok(format!("{}:{}", node_ip, kubelet_port))
+        },
+        _ => Err(ErrResponse::new(String::from("Failed to get pod"), None)),
+    }
+}
 
+/// Proxy request to rKubelet on the pod's node
+pub async fn proxy_to_rkubelet(
+    app_state: Arc<AppState>,
+    uri: Uri,
+    pod_name: String,
+    mut request: Request<Body>,
+) -> axum::http::Response<Body> {
+    let addr = pod_node_rkubelet_addr(app_state.clone(), pod_name).await;
+    match addr {
+        Ok(addr) => {
             let path = uri.path();
             let path_query = uri.path_and_query().map(|v| v.as_str()).unwrap_or(path);
-            tracing::debug!("Proxying request to {}", path_query);
-            let uri = format!("http://{}:{}{}", node_ip, kubelet_port, path_query);
+            let uri = format!("http://{}{}", addr, path_query);
+            tracing::debug!("Proxying request to {}", uri);
             *request.uri_mut() = Uri::try_from(uri).unwrap();
             let client = Client::<HttpConnector, Body>::new();
             client.request(request).await.unwrap_or_else(|e| {
@@ -301,5 +320,98 @@ pub async fn proxy_to_rkubelet(
         _ => axum::http::Response::new(Body::from(
             ErrResponse::new(String::from("Pod not found"), None).json(),
         )),
+    }
+}
+
+/// Proxy websocket to rKubelet on the pod's node
+pub async fn proxy_ws_to_rkubelet(
+    app_state: Arc<AppState>,
+    uri: Uri,
+    pod_name: String,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ErrResponse> {
+    let addr = pod_node_rkubelet_addr(app_state.clone(), pod_name).await;
+    match addr {
+        Ok(addr) => {
+            let path = uri.path();
+            let path_query = uri.path_and_query().map(|v| v.as_str()).unwrap_or(path);
+            let uri = format!("ws://{}{}", addr, path_query);
+            tracing::debug!("Proxying websocket to {}", uri);
+
+            let (stream, _) = connect_async(uri).await.map_err(|e| {
+                ErrResponse::new(
+                    String::from("Failed to connect to rKubelet"),
+                    Some(e.to_string()),
+                )
+            })?;
+            let (mut server_sender, mut server_receiver) = stream.split();
+
+            Ok(ws.on_upgrade(|socket| async move {
+                let (mut client_sender, mut client_receiver) = socket.split();
+
+                loop {
+                    tokio::select! {
+                        Some(msg) = client_receiver.next() => {
+                            match msg {
+                                Ok(msg) => {
+                                    if let Err(err) = server_sender.send(into_tungstenite(msg)).await {
+                                        tracing::error!("Failed to send message to rKubelet: {}", err);
+                                        break;
+                                    }
+                                },
+                                _ => break,
+                            }
+                        },
+                        Some(msg) = server_receiver.next() => {
+                            match msg {
+                                Ok(msg) => {
+                                    if let Err(err) = client_sender.send(from_tungstenite(msg).unwrap()).await {
+                                        tracing::error!("Failed to send message to client: {}", err);
+                                        break;
+                                    }
+                                },
+                                _ => break,
+                            }
+                        },
+                        else => break,
+                    }
+                }
+                client_sender.close().await.ok();
+            }))
+        },
+        _ => Err(ErrResponse::new(String::from("Pod not found"), None)),
+    }
+}
+
+/// Convert axum Message into tunngenite Message,
+/// copied from axum::extract::ws since it's private.
+fn into_tungstenite(message: Message) -> ts::Message {
+    match message {
+        Message::Text(text) => ts::Message::Text(text),
+        Message::Binary(binary) => ts::Message::Binary(binary),
+        Message::Ping(ping) => ts::Message::Ping(ping),
+        Message::Pong(pong) => ts::Message::Pong(pong),
+        Message::Close(Some(close)) => ts::Message::Close(Some(ts::protocol::CloseFrame {
+            code: ts::protocol::frame::coding::CloseCode::from(close.code),
+            reason: close.reason,
+        })),
+        Message::Close(None) => ts::Message::Close(None),
+    }
+}
+
+/// Convert tunngenite Message into axum Message,
+/// copied from axum::extract::ws since it's private.
+fn from_tungstenite(message: ts::Message) -> Option<Message> {
+    match message {
+        ts::Message::Text(text) => Some(Message::Text(text)),
+        ts::Message::Binary(binary) => Some(Message::Binary(binary)),
+        ts::Message::Ping(ping) => Some(Message::Ping(ping)),
+        ts::Message::Pong(pong) => Some(Message::Pong(pong)),
+        ts::Message::Close(Some(close)) => Some(Message::Close(Some(CloseFrame {
+            code: close.code.into(),
+            reason: close.reason,
+        }))),
+        ts::Message::Close(None) => Some(Message::Close(None)),
+        ts::Message::Frame(_) => None,
     }
 }

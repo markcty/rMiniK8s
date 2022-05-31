@@ -137,3 +137,13 @@ pub async fn container_logs(
 ) -> axum::http::Response<Body> {
     proxy_to_rkubelet(app_state, uri, pod_name, request).await
 }
+
+#[debug_handler]
+pub async fn container_exec(
+    Extension(app_state): Extension<Arc<AppState>>,
+    OriginalUri(uri): OriginalUri,
+    Path((pod_name, _)): Path<(String, String)>,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ErrResponse> {
+    proxy_ws_to_rkubelet(app_state, uri, pod_name, ws).await
+}
