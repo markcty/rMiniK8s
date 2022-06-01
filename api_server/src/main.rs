@@ -167,6 +167,7 @@ async fn main() -> Result<()> {
             .route("/:name",
                    get(handler::node::get)
                        .put(handler::node::update)
+                       .patch(handler::node::patch)
                        .delete(handler::node::delete),
             ),
     );

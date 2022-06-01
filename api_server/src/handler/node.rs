@@ -121,6 +121,32 @@ pub async fn delete(
 }
 
 #[debug_handler]
+pub async fn patch(
+    Extension(app_state): Extension<Arc<AppState>>,
+    Path(node_name): Path<String>,
+    Json(payload): Json<KubeObject>,
+) -> HandlerResult<()> {
+    let mut object = etcd_get_object(
+        &app_state,
+        format!("/api/v1/nodes/{}", node_name),
+        Some("node"),
+    )
+    .await?;
+    match (&payload, &mut object) {
+        (KubeObject::Node(payload_node), KubeObject::Node(ref mut node)) => {
+            node.metadata.labels = payload_node.metadata.labels.clone();
+            etcd_put(&app_state, &object).await?;
+            let res = Response::new(Some(format!("node/{} patched", node_name)), None);
+            Ok(Json(res))
+        },
+        _ => Err(ErrResponse::new(
+            String::from("Error patching node"),
+            Some(format!("Expecting node kind, got {}", payload.kind())),
+        )),
+    }
+}
+
+#[debug_handler]
 pub async fn watch_all(
     Extension(app_state): Extension<Arc<AppState>>,
     ws: WebSocketUpgrade,

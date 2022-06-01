@@ -12,6 +12,7 @@ use crate::config::kubelet::KubeletConfig;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Node {
     pub metadata: Metadata,
+    #[serde(default)]
     pub status: NodeStatus,
 }
 
