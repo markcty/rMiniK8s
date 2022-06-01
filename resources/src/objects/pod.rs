@@ -208,6 +208,7 @@ pub struct Container {
     #[serde(default)]
     pub command: Vec<String>,
     /// List of ports to expose from the container.
+    #[serde(default)]
     pub ports: Vec<ContainerPort>,
     /// Pod volumes to mount into the container's filesystem.
     /// Cannot be updated.
@@ -314,11 +315,13 @@ impl std::fmt::Display for VolumeMount {
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 pub struct ResourceRequirements {
     /// Limits describes the maximum amount of compute resources allowed.
+    #[serde(default)]
     pub limits: Resource,
     /// Requests describes the minimum amount of compute resources required.
     /// If Requests is omitted for a container,
     /// it defaults to Limits if that is explicitly specified,
     /// otherwise to an implementation-defined value.
+    #[serde(default)]
     pub requests: Resource,
 }
 
