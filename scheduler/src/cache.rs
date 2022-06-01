@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use resources::{
     informer::Store,
-    objects::{node::Node, pod::Pod},
+    objects::{node::Node, pod::Pod, Labels},
 };
 
 #[derive(Debug, Default)]
 pub struct NodeState {
     pub name: String,
+    pub labels: Labels,
     pub is_ready: bool,
     pub pod_count: u32,
 }
@@ -78,6 +79,7 @@ impl Cache {
             node.metadata.name.to_owned(),
             NodeState {
                 name: node.metadata.name,
+                labels: node.metadata.labels,
                 is_ready,
                 ..Default::default()
             },
@@ -96,6 +98,7 @@ impl Cache {
     pub async fn calculate_node_state(&self, node: &Node) -> NodeState {
         let mut node_state = NodeState {
             name: node.metadata.name.to_owned(),
+            labels: node.metadata.labels.to_owned(),
             is_ready: node.is_ready(),
             ..Default::default()
         };

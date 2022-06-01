@@ -2,12 +2,13 @@ use resources::objects::{object_reference::ObjectReference, pod::Pod};
 
 use crate::cache::{Cache, NodeState};
 
-pub fn simple(_pod: &Pod, cache: &Cache) -> Option<ObjectReference> {
+pub fn simple(pod: &Pod, cache: &Cache) -> Option<ObjectReference> {
     let mut candidate = None;
     cache
         .node_states
         .iter()
         .filter(|(_, state)| state.is_ready)
+        .filter(|(_, state)| state.labels.matches(&pod.spec.node_selector))
         .for_each(|(_, state)| {
             if is_better_than(Some(state), candidate) {
                 candidate = Some(state);

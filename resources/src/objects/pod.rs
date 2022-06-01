@@ -7,7 +7,7 @@ use indenter::indented;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-use super::{function::Function, metrics, Metadata, Object};
+use super::{function::Function, metrics, Labels, Metadata, Object};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Pod {
@@ -167,6 +167,11 @@ pub struct PodSpec {
     /// Default to false.
     #[serde(default)]
     pub host_network: bool,
+    /// NodeSelector is a selector which must be true for the pod to fit on a node.
+    /// Selector which must match a node's labels
+    /// for the pod to be scheduledon that node.
+    #[serde(default)]
+    pub node_selector: Labels,
     /// NodeName is a request to schedule this pod onto a specific node.
     /// If it is non-empty, the scheduler simply schedules this pod onto that node,
     /// assuming that it fits resource requirements.
