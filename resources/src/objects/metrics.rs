@@ -10,7 +10,7 @@ pub enum Resource {
     Memory,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 /// Metrics of containers in a pod.
 pub struct PodMetrics {
     /// Pod name
@@ -22,13 +22,13 @@ pub struct PodMetrics {
     pub containers: Vec<ContainerMetrics>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ContainerMetrics {
     pub name: String,
     pub usage: HashMap<Resource, i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 /// An overall summary of PodMetrics.
 pub struct PodMetric {
     pub timestamp: NaiveDateTime,
@@ -40,7 +40,7 @@ pub struct PodMetric {
 /// A mapping from pod names to metrics.
 pub type PodMetricsInfo = HashMap<String, PodMetric>;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FunctionMetric {
     /// Function name
     pub name: String,

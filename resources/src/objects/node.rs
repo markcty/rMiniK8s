@@ -7,7 +7,7 @@ use strum::Display;
 
 use super::{Metadata, Object};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Node {
     pub metadata: Metadata,
     pub status: NodeStatus,
@@ -60,7 +60,7 @@ impl std::fmt::Display for Node {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeStatus {
     /// List of addresses reachable to the node.
@@ -99,7 +99,7 @@ pub enum NodeAddressType {
     InternalIP,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 pub struct NodeInfo {
     /// The Architecture reported by the node. Required
     pub architecture: String,
@@ -122,7 +122,7 @@ impl std::fmt::Display for NodeInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 pub struct Capacity {
     /// Number of cpu cores on the node.
     pub cpu: u16,

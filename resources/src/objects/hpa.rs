@@ -5,7 +5,7 @@ use super::{
     function::Function, metrics::Resource, object_reference::ObjectReference, Metadata, Object,
 };
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct HorizontalPodAutoscaler {
     pub metadata: Metadata,
     pub spec: HorizontalPodAutoscalerSpec,
@@ -52,7 +52,7 @@ impl HorizontalPodAutoscaler {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HorizontalPodAutoscalerSpec {
     /// The upper limit for the number of replicas
@@ -98,7 +98,7 @@ fn default_metrics() -> MetricSource {
 /// HorizontalPodAutoscalerBehavior configures the scaling behavior
 /// of the target in both Up and Down directions
 /// (scaleUp and scaleDown fields respectively).
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HorizontalPodAutoscalerBehavior {
     /// Scaling policy for scaling Down.
@@ -163,7 +163,7 @@ impl Default for HorizontalPodAutoscalerBehavior {
 /// They can prevent flapping by specifying the stabilization window,
 /// so that the number of replicas is not set instantly,
 /// instead, the safest value from the stabilization window is chosen.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HPAScalingRules {
     /// A list of potential scaling polices which can be used during scaling.
@@ -194,7 +194,7 @@ impl HPAScalingRules {
 }
 
 /// PolicySelection describes how to choose a policy from multiple ones
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum PolicySelection {
     /// Select the policy with the lowest recommendation value.
     Min,
@@ -212,7 +212,7 @@ impl Default for PolicySelection {
 
 /// HPAScalingPolicy is a single policy
 /// which must hold true for a specified past interval.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HPAScalingPolicy {
     /// Specify the scaling policy.
@@ -227,13 +227,13 @@ pub struct HPAScalingPolicy {
     pub period_seconds: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ScalingPolicyType {
     Pods,
     Percent,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum MetricSource {
     Resource(ResourceMetricSource),
@@ -244,7 +244,7 @@ pub enum MetricSource {
 /// known to Kubernetes, as specified in requests and limits,
 /// describing each pod in the current scale target (e.g. CPU or memory).
 /// The values will be averaged together before being compared to the target.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ResourceMetricSource {
     /// Name of the resource.
     pub name: Resource,
@@ -261,7 +261,7 @@ impl Default for ResourceMetricSource {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct FunctionMetricSource {
     /// Name of the function.
     pub name: String,
@@ -271,7 +271,7 @@ pub struct FunctionMetricSource {
 
 /// MetricTarget defines the target value, average value,
 /// or average utilization of a specific metric.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum MetricTarget {
     /// Target value of the average of the resource metric
@@ -285,7 +285,7 @@ pub enum MetricTarget {
     AverageValue(u64),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HorizontalPodAutoscalerStatus {
     /// Desired number of replicas of pods managed by this autoscaler,

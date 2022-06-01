@@ -7,7 +7,7 @@ use super::{
 
 /// ReplicaSet ensures that a specified number of pod replicas are running
 /// at any given time.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ReplicaSet {
     pub metadata: Metadata,
     /// Defines the specification of the desired behavior of the ReplicaSet.
@@ -70,7 +70,7 @@ impl ReplicaSet {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ReplicaSetSpec {
     /// A label query over pods that should match the replica count.
     /// Label keys and values that must match
@@ -92,7 +92,7 @@ fn default_replicas() -> u32 {
     1
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplicaSetStatus {
     /// The most recently oberved number of replicas.

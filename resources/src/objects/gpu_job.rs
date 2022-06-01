@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{pod::PodTemplateSpec, Metadata, Object};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct GpuJob {
     /// Standard object's metadata.
     pub metadata: Metadata,
@@ -22,7 +22,7 @@ impl Object for GpuJob {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GpuJobSpec {
     /// GPU config of the GpuJob.
@@ -43,14 +43,14 @@ pub struct GpuJobSpec {
     pub back_off_limit: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GpuConfig {
     pub slurm_config: SlurmConfig,
     pub compile_scripts: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SlurmConfig {
     pub partition: String,
@@ -61,7 +61,7 @@ pub struct SlurmConfig {
     pub scripts: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct GpuJobStatus {
     /// The number of pending and running pods.
     pub active: u32,

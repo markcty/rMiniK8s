@@ -7,14 +7,14 @@ use super::{
     Labels, Metadata, Object,
 };
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Function {
     pub metadata: Metadata,
     pub spec: FunctionSpec,
     pub status: Option<FunctionStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionSpec {
     /// The upper limit for the number of replicas
@@ -42,7 +42,7 @@ fn default_max_replicas() -> u32 {
     10
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionStatus {
     pub service_ref: String,

@@ -9,7 +9,7 @@ use strum::{Display, EnumIter, IntoEnumIterator};
 
 use super::{function::Function, metrics, Metadata, Object};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Pod {
     pub metadata: Metadata,
     pub spec: PodSpec,
@@ -139,7 +139,7 @@ impl std::fmt::Display for Pod {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PodSpec {
     /// List of containers belonging to the pod.
@@ -176,7 +176,7 @@ impl PodSpec {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Container {
     /// Name of the container specified as a DNS_LABEL.
@@ -276,7 +276,7 @@ pub enum ImagePullPolicy {
     IfNotPresent,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerPort {
     /// Number of port to expose on the pod's IP address.
@@ -284,7 +284,7 @@ pub struct ContainerPort {
     pub container_port: u16,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct VolumeMount {
     /// Path within the container at which the volume should be mounted.
@@ -299,7 +299,7 @@ impl std::fmt::Display for VolumeMount {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 pub struct ResourceRequirements {
     /// Limits describes the maximum amount of compute resources allowed.
     pub limits: Resource,
@@ -342,7 +342,7 @@ impl ResourceRequirements {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 #[serde(default)]
 pub struct Resource {
     /// CPU unit in milli CPU.
@@ -358,7 +358,7 @@ impl std::fmt::Display for Resource {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Volume {
     /// Volume's name.
     /// Must be a DNS_LABEL and unique within the pod.
@@ -373,7 +373,7 @@ impl std::fmt::Display for Volume {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum VolumeConfig {
     /// HostPath represents a pre-existing file
@@ -573,7 +573,7 @@ impl Pod {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct PodTemplateSpec {
     /// Standard object's metadata.
     pub metadata: Metadata,

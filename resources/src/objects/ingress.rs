@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Metadata, Object};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Ingress {
     pub metadata: Metadata,
     pub spec: IngressSpec,
@@ -22,13 +22,13 @@ impl Object for Ingress {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct IngressSpec {
     /// A list of host rules used to configure the Ingress.
     pub rules: Vec<IngressRule>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct IngressRule {
     /// Host is the fully qualified domain name of a network host.
     /// It should always end with .minik8s.com
@@ -38,7 +38,7 @@ pub struct IngressRule {
     pub paths: Vec<IngressPath>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct IngressPath {
     /// Path is matched against the path of an incoming request.
     pub path: String,
@@ -46,7 +46,7 @@ pub struct IngressPath {
     pub service: IngressService,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct IngressService {
     /// Name is the referenced service. The service must exist in the same namespace as the Ingress object.
     pub name: String,

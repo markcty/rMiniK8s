@@ -5,14 +5,14 @@ use serde_json::Value;
 
 use super::{Metadata, Object};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Workflow {
     pub metadata: Metadata,
     pub spec: WorkflowSpec,
     pub status: Option<WorkflowStatus>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowSpec {
     /// A string that must exactly match (is case sensitive) the name of one of the state objects.
@@ -21,7 +21,7 @@ pub struct WorkflowSpec {
     pub states: HashMap<String, State>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStatus {
     pub current_state: String,
@@ -38,14 +38,14 @@ impl Object for Workflow {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum State {
     Task(Task),
     Choice(Choice),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Task {
     /// Identifies the specific function to excute.
     pub resource: String,
@@ -55,20 +55,20 @@ pub struct Task {
     pub next: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Choice {
     pub rules: Vec<ChoiceRule>,
     pub default: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ChoiceRule {
     #[serde(flatten)]
     pub comparison: Comparison,
     pub next: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum Comparison {
     FieldEquals { field: String, content: String },

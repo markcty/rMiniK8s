@@ -20,7 +20,7 @@ pub mod replica_set;
 pub mod service;
 pub mod workflow;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[enum_dispatch(Object)]
 #[serde(tag = "kind")]
 pub enum KubeObject {
@@ -36,7 +36,7 @@ pub enum KubeObject {
     Workflow(workflow::Workflow),
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
     /// Name must be unique within a namespace.
@@ -106,7 +106,7 @@ pub trait Object:
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
 pub struct Labels(pub HashMap<String, String>);
 
 impl ToString for Labels {
