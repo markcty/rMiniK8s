@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo
+  labels:
+    app: demo
+spec:
+  volumes:
+  - name: nginx-files
+    emptyDir:
+  - name: download-files
+    emptyDir:
+
+  containers:
+  - name: busybox
+    image: busybox:latest
+    command:
+      - ifconfig
+    imagePullPolicy: IfNotPresent
+
+  - name: viewer
+    image: dplsming/nginx-fileserver:1.0
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: nginx-files
+      mountPath: /usr/share/nginx/html/files
+    - name: download-files
+      mountPath: /data
+  
+  - name: downloader
+    image: dplsming/aria2ng-downloader:1.0
+    ports:
+    - containerPort: 6800
+    - containerPort: 6880
+    volumeMounts:
+    - name: nginx-files
+      mountPath: /usr/share/nginx/html/files
+    - name: download-files
+      mountPath: /data
+    resources:
+      limits:
+        # 100 milli-CPU
+        cpu: 100
+        # 128MB
+        memory: 134217728
