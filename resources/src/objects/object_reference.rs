@@ -7,3 +7,12 @@ pub struct ObjectReference {
     /// Name of the referent.
     pub name: String,
 }
+
+impl ObjectReference {
+    pub fn new(kind: String, name: String) -> ObjectReference {
+        ObjectReference {
+            kind,
+            name,
+        }
+    }
+}

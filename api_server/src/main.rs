@@ -146,12 +146,16 @@ async fn main() -> Result<()> {
                 get(handler::gpu_job::list)
                 .post(handler::gpu_job::create),
             )
-            .route(
+            .nest(
                 "/:name",
-                get(handler::gpu_job::get)
-                    .put(handler::gpu_job::update)
-                    .patch(handler::gpu_job::patch)
-                    .delete(handler::gpu_job::delete),
+                Router::new()
+                    .route("/",
+                    get(handler::gpu_job::get)
+                        .put(handler::gpu_job::update)
+                        .patch(handler::gpu_job::patch)
+                        .delete(handler::gpu_job::delete))
+                    .route("/logs",
+                        get(handler::gpu_job::job_logs))
             ),
     );
 

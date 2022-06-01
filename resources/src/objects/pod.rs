@@ -45,6 +45,14 @@ impl Pod {
         }
     }
 
+    pub fn is_succeeded(&self) -> bool {
+        if let Some(status) = &self.status {
+            status.phase == PodPhase::Succeeded
+        } else {
+            false
+        }
+    }
+
     pub fn requests(&self, resource: &metrics::Resource) -> i64 {
         self.spec
             .containers

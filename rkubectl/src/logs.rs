@@ -8,23 +8,31 @@ use crate::utils::gen_url;
 
 #[derive(Args)]
 pub struct Arg {
-    /// Pod name
-    pod_name: String,
+    /// Job or Pod name
+    name: String,
     /// Container name, optional if there's only one container
     container_name: Option<String>,
     /// Tail option
     #[clap(short, long)]
     tail: Option<String>,
+    #[clap(short, parse(from_flag))]
+    job: bool,
 }
 
 impl Arg {
     pub async fn handle(&self) -> Result<()> {
         let client = Client::new();
-        let base_url = gen_url("pods".to_string(), Some(&self.pod_name))?;
-        let url = match self.container_name {
-            Some(ref container_name) => format!("{base_url}/containers/{container_name}/logs"),
-            None => format!("{base_url}/logs"),
+        let url = if self.job {
+            let base_url = gen_url("gpujobs".to_string(), Some(&self.name))?;
+            format!("{base_url}/logs")
+        } else {
+            let base_url = gen_url("pods".to_string(), Some(&self.name))?;
+            match self.container_name {
+                Some(ref container_name) => format!("{base_url}/containers/{container_name}/logs"),
+                None => format!("{base_url}/logs"),
+            }
         };
+
         let res = client
             .get(url)
             .query(&[("tail", &self.tail.as_ref().unwrap_or(&"all".to_string()))])
