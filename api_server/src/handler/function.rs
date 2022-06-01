@@ -70,7 +70,7 @@ pub async fn create(
                     break;
                 }
             }
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
             if i % 5 == 0 {
                 tracing::info!("Image creation for function {} is still pending", name);
             }

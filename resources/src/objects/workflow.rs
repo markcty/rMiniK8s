@@ -77,7 +77,11 @@ pub enum Comparison {
 
 impl ChoiceRule {
     pub fn match_with(&self, text: &str) -> bool {
-        let args: serde_json::Map<String, Value> = serde_json::from_str(text).unwrap();
+        let args: serde_json::Map<String, Value> = if let Ok(args) = serde_json::from_str(text) {
+            args
+        } else {
+            return false;
+        };
         match self.comparison {
             Comparison::FieldEquals {
                 ref field,
