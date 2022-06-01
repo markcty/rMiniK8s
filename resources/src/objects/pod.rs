@@ -497,8 +497,6 @@ pub enum PodPhase {
 pub enum PodConditionType {
     /// All containers in the pod are ready.
     ContainersReady,
-    /// All init containers have completed successfully.
-    Initialized,
     /// The pod has been scheduled to a node.
     PodScheduled,
     /// The pod is able to serve requests
