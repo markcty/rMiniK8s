@@ -40,6 +40,7 @@ lazy_static! {
 
 mod route;
 mod utils;
+mod workflow;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

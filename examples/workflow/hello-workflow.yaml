@@ -1,0 +1,37 @@
+kind: Workflow
+metadata:
+  name: hello_workflow
+spec:
+  startAt: FirstState
+  states:
+    firstState:
+      type: Task
+      resource: echo_string
+      next: ChoiceState
+    choiceState:
+      type: Choice
+      choices:
+        - type: FieldEquals
+          field: ans
+          content: "8"
+          next: FirstMatchState
+        - type: FieldNumEquals
+          field: ans
+          content: 8
+          next: secondMatchState
+      default: DefaultState
+    firstMatchState:
+      type: Task
+      resource: append_world
+      next: NextState
+    secondMatchState:
+      type: Task
+      resource: append_rust
+      next: NextState
+    defaultState:
+      type: Fail
+      error: DefaultStateError
+      cause: "No Matches!"
+    nextState:
+      type: Task
+      resource: append_from_minik8s

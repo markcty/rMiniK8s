@@ -14,6 +14,7 @@ pub mod replica_set;
 mod response;
 pub mod service;
 mod utils;
+pub mod workflow;
 
 impl AppState {
     pub async fn get_client(&self) -> Result<EtcdClient, ErrResponse> {

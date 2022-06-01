@@ -1,0 +1,12 @@
+[Unit]
+Description=DNS for rminik8s
+After=network-online.target firewalld.service containerd.service time-set.target
+
+[Service]
+EnvironmentFile=/etc/rminik8s/conf.env
+ExecStart=/usr/local/bin/coredns -conf /config/Corefile
+Restart=on-failure
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target

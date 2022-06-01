@@ -1,0 +1,28 @@
+kind: Workflow
+metadata:
+  name: guess
+spec:
+  startAt: add
+  states:
+    add:
+      type: Task
+      resource: add
+      next: minus3
+    minus3:
+      type: Task
+      resource: minus3
+      next: guess
+    guess:
+      type: Choice
+      rules:
+        - type: FieldNumEquals
+          field: ans
+          content: 10
+          next: right
+      default: wrong
+    right:
+      type: Task
+      resource: right
+    wrong:
+      type: Task
+      resource: wrong

@@ -6,7 +6,7 @@ use resources::{
     objects::{function::Function, service::Service, KubeObject, Object},
 };
 
-use crate::{CONFIG, REQUESTS_COUNTER};
+use crate::{workflow::handle_workflow, CONFIG, REQUESTS_COUNTER};
 
 async fn route(
     mut req: Request<Body>,
@@ -17,54 +17,69 @@ async fn route(
     let func_key;
     let func_name;
     let svc_key;
-    // find the function
-    {
-        let host = req
-            .headers()
-            .get(hyper::header::HOST)
-            .ok_or_else(|| anyhow!("No host"))?
-            .to_str()?
-            // strip off the port
-            .split(':')
+    let host = req
+        .headers()
+        .get(hyper::header::HOST)
+        .ok_or_else(|| anyhow!("No host"))?
+        .to_str()?
+        // strip off the port
+        .split(':')
+        .next()
+        .ok_or_else(|| anyhow!("No host"))?
+        .to_owned();
+
+    if host.ends_with(".workflow.func.minik8s.com") {
+        // find the workflow
+        let workflow = host
+            .split('.')
             .next()
-            .ok_or_else(|| anyhow!("No host"))?;
+            .ok_or_else(|| anyhow!("No such workflow"))?;
+        let body = String::from_utf8(hyper::body::to_bytes(req.body_mut()).await?.to_vec())?;
+        handle_workflow(workflow, body).await
+    } else if host.ends_with(".func.minik8s.com") {
+        {
+            // find the function
+            let func_store = func_store.read().await;
+            let (key, func) = func_store
+                .iter()
+                .find(|(_, func)| func.status.as_ref().unwrap().host == host)
+                .ok_or_else(|| anyhow!("No such function matching host: {}", host))?;
+            func_key = key.to_owned();
+            func_name = func.metadata.name.to_owned();
 
-        let func_store = func_store.read().await;
-        let (key, func) = func_store
-            .iter()
-            .find(|(_, func)| func.status.as_ref().unwrap().host == host)
-            .ok_or_else(|| anyhow!("No such function matching host: {}", host))?;
-        func_key = key.to_owned();
-        func_name = func.metadata.name.to_owned();
+            svc_key = func.status.as_ref().unwrap().service_ref.clone();
+            let svc = get_svc(&svc_key, svc_store.to_owned()).await?;
+            need_activate = svc.spec.endpoints.is_empty();
+        }
 
-        svc_key = func.status.as_ref().unwrap().service_ref.clone();
-        let svc = get_svc(&svc_key, svc_store.to_owned()).await?;
-        need_activate = svc.spec.endpoints.is_empty();
+        REQUESTS_COUNTER.with_label_values(&[&func_name]).inc();
+        if need_activate {
+            activate(&func_name, svc_key.clone(), svc_store.clone()).await?;
+        }
+
+        let svc = get_svc(&svc_key, svc_store).await?;
+
+        // build new uri
+        let uri = req.uri_mut();
+        tracing::info!("{}", uri);
+        let new_uri = Uri::builder()
+            .scheme(Scheme::HTTP)
+            .authority(svc.spec.cluster_ip.unwrap().to_string())
+            .path_and_query(uri.path_and_query().unwrap().as_str())
+            .build()?;
+        *uri = new_uri;
+
+        tracing::info!("Forward {} to {}", func_key, uri);
+
+        // forward to real service
+        let client = Client::new();
+        Ok(client.request(req).await?)
+    } else {
+        tracing::warn!("Incorrect host: {}", host);
+        let mut res = Response::new(Body::from("No such host"));
+        *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+        Ok(res)
     }
-
-    REQUESTS_COUNTER.with_label_values(&[&func_name]).inc();
-
-    if need_activate {
-        activate(&func_name, svc_key.clone(), svc_store.clone()).await?;
-    }
-
-    let svc = get_svc(&svc_key, svc_store).await?;
-
-    // build new uri
-    let uri = req.uri_mut();
-    tracing::info!("{}", uri);
-    let new_uri = Uri::builder()
-        .scheme(Scheme::HTTP)
-        .authority(svc.spec.cluster_ip.unwrap().to_string())
-        .path_and_query(uri.path_and_query().unwrap().as_str())
-        .build()?;
-    *uri = new_uri;
-
-    tracing::info!("Forward {} to {}", func_key, uri);
-
-    // forward to real service
-    let client = Client::new();
-    Ok(client.request(req).await?)
 }
 
 /// Return Prometheus metrics
@@ -85,7 +100,7 @@ async fn get_svc(svc_key: &str, svc_store: Store<Service>) -> Result<Service> {
     Ok(svc.to_owned())
 }
 
-async fn activate_rs(rs_name: &str) -> Result<()> {
+pub async fn activate_rs(rs_name: &str) -> Result<()> {
     let client = reqwest::Client::new();
     let url = format!(
         "{}api/v1/replicasets/{}",
@@ -120,7 +135,7 @@ async fn activate_rs(rs_name: &str) -> Result<()> {
 
 async fn activate(func_name: &str, svc_key: String, svc_store: Store<Service>) -> Result<()> {
     tracing::info!("Function {} has no instance, activating...", func_name);
-    // TODO: create hpa or ...
+
     activate_rs(func_name).await?;
 
     let mut i = 0;
@@ -151,7 +166,10 @@ pub async fn router(
 ) -> Response<Body> {
     if req.uri().path() == "/metrics" {
         match metrics() {
-            Ok(res) => Response::new(Body::from(res)),
+            Ok(res) => {
+                tracing::debug!("Get metrics succeeded");
+                Response::new(Body::from(res))
+            },
             Err(err) => {
                 tracing::error!("Error processing request: {:#}", err);
                 let mut res = Response::new(Body::from(err.to_string()));
