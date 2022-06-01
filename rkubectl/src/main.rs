@@ -4,11 +4,12 @@ extern crate lazy_static;
 use std::env;
 
 use anyhow::Result;
-use clap::{ArgEnum, Parser, Subcommand};
+use clap::{ArgEnum, IntoApp, Parser, Subcommand};
 use reqwest::Url;
 use resources::objects;
 use strum::Display;
 
+mod completion;
 mod create;
 mod delete;
 mod describe;
@@ -55,6 +56,10 @@ enum Commands {
     Logs(logs::Arg),
     /// Execute commands in a pod container.
     Exec(exec::Arg),
+    /// Generate shell completion.
+    ///
+    /// Usage: echo 'source <(rkubectl completion bash)' >> ~/.bashrc
+    Completion(completion::Arg),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Display)]
@@ -82,6 +87,7 @@ async fn main() -> Result<()> {
         Commands::Describe(arg) => arg.handle().await?,
         Commands::Logs(arg) => arg.handle().await?,
         Commands::Exec(arg) => arg.handle().await?,
+        Commands::Completion(arg) => arg.handle(&mut Cli::command()).await?,
     }
 
     Ok(())
