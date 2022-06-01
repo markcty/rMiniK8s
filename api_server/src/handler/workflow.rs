@@ -115,3 +115,18 @@ pub async fn delete(
     let res = Response::new(Some(format!("workflows/{} deleted", name)), None);
     Ok(Json(res))
 }
+
+#[debug_handler]
+pub async fn list(
+    Extension(app_state): Extension<Arc<AppState>>,
+) -> HandlerResult<Vec<KubeObject>> {
+    let workflows = etcd_get_objects_by_prefix(
+        &app_state,
+        "/api/v1/workflows".to_string(),
+        Some("workflow"),
+    )
+    .await?;
+
+    let res = Response::new(None, Some(workflows));
+    Ok(Json(res))
+}

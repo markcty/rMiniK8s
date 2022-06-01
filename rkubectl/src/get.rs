@@ -9,7 +9,7 @@ use resources::{
         node::NodeAddressType,
         KubeObject::{
             self, Function, GpuJob, HorizontalPodAutoscaler, Ingress, Node, Pod, ReplicaSet,
-            Service,
+            Service, Workflow,
         },
     },
 };
@@ -265,6 +265,20 @@ impl Arg {
                                 .last_scale_time
                                 .map(calc_age)
                                 .unwrap_or_else(|| "Never".to_string())
+                        );
+                    }
+                }
+            },
+            ResourceKind::Workflows => {
+                println!("{:<16} {:<10} {:<}", "NAME", "START", "CURRENT");
+                for object in data {
+                    if let Workflow(workflow) = object {
+                        let status = workflow.status.expect("Workflow has no status");
+                        let current =
+                            format!("{}({})", status.current_state, status.current_result);
+                        println!(
+                            "{:<16} {:<10} {:<}",
+                            workflow.metadata.name, workflow.spec.start_at, current
                         );
                     }
                 }

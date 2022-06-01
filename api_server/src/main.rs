@@ -217,7 +217,8 @@ async fn main() -> Result<()> {
         Router::new()
             .route(
                 "/",
-                post(handler::workflow::create),
+                get(handler::workflow::list)
+                    .post(handler::workflow::create),
             )
             .route(
                 "/:name",

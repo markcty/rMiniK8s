@@ -73,6 +73,7 @@ enum ResourceKind {
     GpuJobs,
     Nodes,
     Functions,
+    Workflows,
 }
 
 #[tokio::main]
