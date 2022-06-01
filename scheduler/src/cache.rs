@@ -1,4 +1,7 @@
-use resources::{informer::Store, objects::{pod::Pod, node::Node}};
+use resources::{
+    informer::Store,
+    objects::{node::Node, pod::Pod},
+};
 
 pub struct Cache {
     pub pod_cache: Store<Pod>,
