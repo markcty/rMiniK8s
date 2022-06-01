@@ -1,5 +1,14 @@
+#[macro_use]
+extern crate lazy_static;
+
+use std::env;
+
 use anyhow::Result;
-use resources::objects::{node::Node, pod::Pod};
+use reqwest::Url;
+use resources::{
+    models::NodeConfig,
+    objects::{node::Node, pod::Pod},
+};
 use tokio::sync::mpsc;
 
 use crate::{cache::Cache, informer::*, scheduler::Scheduler};
@@ -21,6 +30,22 @@ pub enum NodeUpdate {
     Add(Node),
     Update(Node, Node),
     Delete(Node),
+}
+
+lazy_static! {
+    static ref CONFIG: NodeConfig = {
+        dotenv::from_path("/etc/rminik8s/node.env").ok();
+        NodeConfig {
+            etcd_endpoint: match env::var("ETCD_ENDPOINT") {
+                Ok(url) => Url::parse(url.as_str()).unwrap(),
+                Err(_) => Url::parse("http://127.0.0.1:2379/").unwrap(),
+            },
+            api_server_endpoint: match env::var("API_SERVER_ENDPOINT") {
+                Ok(url) => Url::parse(url.as_str()).unwrap(),
+                Err(_) => Url::parse("http://127.0.0.1:8080/").unwrap(),
+            },
+        }
+    };
 }
 
 #[tokio::main]

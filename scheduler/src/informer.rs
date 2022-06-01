@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Error};
-use reqwest::Url;
 use resources::{
     informer::{EventHandler, Informer, ListerWatcher, ResyncHandler, Store, WsStream},
     models,
@@ -11,7 +10,7 @@ use tokio::{
 };
 use tokio_tungstenite::connect_async;
 
-use crate::{NodeUpdate, PodUpdate};
+use crate::{NodeUpdate, PodUpdate, CONFIG};
 
 pub type RunInformerResult<T, E> = (
     Sender<E>,
@@ -35,7 +34,7 @@ pub fn run_pod_informer(
     let lw = ListerWatcher::<Pod> {
         lister: Box::new(|_| {
             Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/pods")
+                let res = reqwest::get(CONFIG.api_server_endpoint.join("api/v1/pods")?)
                     .await?
                     .json::<models::Response<Vec<Pod>>>()
                     .await?;
@@ -45,7 +44,8 @@ pub fn run_pod_informer(
         }),
         watcher: Box::new(|_| {
             Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/pods")?;
+                let mut url = CONFIG.api_server_endpoint.join("api/v1/watch/pods")?;
+                url.set_scheme("ws").ok();
                 let (stream, _) = connect_async(url).await?;
                 Ok::<WsStream, Error>(stream)
             })
@@ -107,7 +107,7 @@ pub fn run_node_informer(
     let lw = ListerWatcher::<Node> {
         lister: Box::new(|_| {
             Box::pin(async {
-                let res = reqwest::get("http://localhost:8080/api/v1/nodes")
+                let res = reqwest::get(CONFIG.api_server_endpoint.join("api/v1/nodes")?)
                     .await?
                     .json::<models::Response<Vec<Node>>>()
                     .await?;
@@ -117,7 +117,8 @@ pub fn run_node_informer(
         }),
         watcher: Box::new(|_| {
             Box::pin(async {
-                let url = Url::parse("ws://localhost:8080/api/v1/watch/nodes")?;
+                let mut url = CONFIG.api_server_endpoint.join("api/v1/watch/nodes")?;
+                url.set_scheme("ws").ok();
                 let (stream, _) = connect_async(url).await?;
                 Ok::<WsStream, Error>(stream)
             })

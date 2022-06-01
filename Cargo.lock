@@ -2415,6 +2415,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dashmap",
+ "dotenv",
+ "lazy_static 1.4.0",
  "reqwest",
  "resources",
  "serde_json",

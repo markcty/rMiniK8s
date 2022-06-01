@@ -108,6 +108,14 @@ services:
     depends_on:
       - api_server
 
+  scheduler:
+    image: minik8s.xyz/scheduler-arm:latest
+    container_name: scheduler
+    environment:
+      - API_SERVER_ENDPOINT=http://api_server:8080
+    depends_on:
+      - api_server
+
 networks:
   default:
     ipam:

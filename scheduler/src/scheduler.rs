@@ -8,7 +8,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
 };
 
-use crate::{cache::Cache, informer::ResyncNotification, NodeUpdate, PodUpdate};
+use crate::{cache::Cache, informer::ResyncNotification, NodeUpdate, PodUpdate, CONFIG};
 
 pub struct Scheduler<T>
 where
@@ -81,12 +81,8 @@ where
             target: node,
         });
 
-        let res = self
-            .client
-            .post("http://localhost:8080/api/v1/bindings")
-            .json(&binding)
-            .send()
-            .await?;
+        let url = CONFIG.api_server_endpoint.join("api/v1/bindings")?;
+        let res = self.client.post(url).json(&binding).send().await?;
 
         if let Err(err) = res.error_for_status_ref() {
             let err_res = res.json::<models::ErrResponse>().await?;
