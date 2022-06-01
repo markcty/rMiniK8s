@@ -7,6 +7,14 @@ packages:
   - curl
   - gnupg
   - lsb-release
+  - zip
+  - etcd-client
+  - tmux
+  - httpie
+  - fzf
+  - fd-find
+  - bat
+  - fish
 # create the docker group
 groups:
   - docker
@@ -23,5 +31,5 @@ system_info:
 runcmd:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
   - echo "deb [arch=$(dpkg --print-architecture)] https://mirror.sjtu.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
-  - apt-get update
-  - apt-get install -y docker-ce docker-compose zip etcd-client tmux httpie
+  - apt-get update && apt-get install -y docker-ce docker-compose
+  - chsh -s /bin/fish

@@ -8,7 +8,9 @@ services:
       - "8080:8080"
     environment:
       - "ETCD_ENDPOINT=${ETCD_ENDPOINT}"
-      - "METRICS_SERVER=prometheus:9090"
+      - "METRICS_SERVER=http://prometheus:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     depends_on:
       - prometheus
     networks:
