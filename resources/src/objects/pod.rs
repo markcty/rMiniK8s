@@ -337,7 +337,7 @@ impl std::fmt::Display for ResourceRequirements {
 impl ResourceRequirements {
     pub fn cpu_shares(&self) -> i64 {
         ResourceRequirements::milli_cpu_to_shares(
-            if self.requests.cpu == 0 && !self.limits.cpu == 0 {
+            if self.requests.cpu == 0 && self.limits.cpu != 0 {
                 self.limits.cpu
             } else {
                 self.requests.cpu
