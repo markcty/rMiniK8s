@@ -109,5 +109,5 @@ printf "    ingress:           http://${INGRESS_IP}\n"
 printf "    serverless-router: http://${SERVERLESS_ROUTER_IP}\n"
 printf "    prometheus:        http://${PROMETHEUS_IP}:9090\n"
 printf "    etcd:              $ETCD_ENDPOINT\n"
-printf "    dns:               $IP:53\n"
-
+printf "    dns:               $IP:53\n\n"
+printf "You can connect to the control plane by this IP: $IP\n"

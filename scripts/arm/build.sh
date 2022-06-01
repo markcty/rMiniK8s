@@ -7,7 +7,7 @@ cd ../..
 cargo build --release
 cd ./target/release
 for file in *; do
-  mv "$file" "${file}-arm"
+  cp "$file" "${file}-arm"
 done
 
 curl -F "api_server=@api_server-arm" http://minik8s.xyz:8008/api/upload
@@ -22,7 +22,3 @@ curl -F "scheduler-arm=@scheduler-arm" http://minik8s.xyz:8008/api/upload
 curl -F "gpujob-controller-arm=@gpujob-controller-arm" http://minik8s.xyz:8008/api/upload
 curl -F "function-controller-arm=@function-controller-arm" http://minik8s.xyz:8008/api/upload
 curl -F "serverless-router-arm=@serverless-router-arm" http://minik8s.xyz:8008/api/upload
-
-for file in *; do
-  mv "$file" "${file::-4}"
-done
