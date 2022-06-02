@@ -125,7 +125,7 @@ void testAdd() {
 
     printf("GPU Execution Time: %f ms\n", duration_millsecond);
 
-    cudaMemcpy(C_from_gpu, C_dev, nBytes, cudaMemcpyDeviceToHost);
+    CHECK(cudaMemcpy(C_from_gpu, C_dev, nBytes, cudaMemcpyDeviceToHost));
     beforeTime = std::chrono::steady_clock::now();
     sumMatrix2DonCPU(A_host, B_host, C_host, nx, ny);
     afterTime = std::chrono::steady_clock::now();
@@ -135,7 +135,6 @@ void testAdd() {
 
     printf("CPU Execution Time: %f ms\n", duration_millsecond);
 
-    CHECK(cudaMemcpy(C_from_gpu, C_dev, nBytes, cudaMemcpyDeviceToHost));
     checkResult(C_host, C_from_gpu, nx * ny);
 
     cudaFree(A_dev);
