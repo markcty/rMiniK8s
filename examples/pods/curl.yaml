@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl
+  labels:
+    app: curl
+spec:
+  containers:
+    - name: httpd-curl
+      image: httpd:2.4.53
+      ports:
+        - containerPort: 80
