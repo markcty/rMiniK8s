@@ -8,7 +8,7 @@ services:
       - "8080:8080"
     environment:
       - "ETCD_ENDPOINT=${ETCD_ENDPOINT}"
-      - "METRICS_SERVER=http://prometheus:9090"
+      - "METRICS_SERVER=prometheus:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     depends_on:
@@ -23,6 +23,8 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     command: --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
     networks:
       default:
         ipv4_address: "$PROMETHEUS_IP"

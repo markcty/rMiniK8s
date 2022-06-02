@@ -308,7 +308,7 @@ pub async fn write_config(config: PromConfig) -> Result<(), ErrResponse> {
 pub async fn reload_config(metrics_server: &str) -> Result<(), ErrResponse> {
     let client = reqwest::Client::new();
     let response = client
-        .post(format!("{}/-/reload", metrics_server).as_str())
+        .post(format!("http://{}/-/reload", metrics_server).as_str())
         .send()
         .await
         .map_err(|err| {

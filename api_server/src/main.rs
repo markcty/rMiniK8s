@@ -23,7 +23,10 @@ const METRICS_SERVER_CONFIG: &str = "/etc/prometheus/prometheus.yml";
 struct ServerConfig {
     #[serde(default = "default_log_level")]
     log_level: String,
+    /// format: http://IP:PORT
     etcd_endpoint: String,
+    /// format: host:port
+    /// IMPORTENT: Don't start with http
     metrics_server: String,
 }
 fn default_log_level() -> String {
