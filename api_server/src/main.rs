@@ -127,11 +127,10 @@ async fn main() -> Result<()> {
     let ingress_route = Router::new().nest(
         "/ingresses",
         Router::new()
-            .route("/", get(handler::ingress::list))
+            .route("/", get(handler::ingress::list).post(handler::ingress::create))
             .route(
                 "/:name",
-                post(handler::ingress::create)
-                    .get(handler::ingress::get)
+                     get(handler::ingress::get)
                     .put(handler::ingress::update)
                     .delete(handler::ingress::delete),
             ),

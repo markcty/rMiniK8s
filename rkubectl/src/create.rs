@@ -84,16 +84,11 @@ async fn create_with_file(object: &KubeObject, path: PathBuf) -> Result<String> 
             serde_json::to_string(&object)?,
         )
         .part("code", file);
-    let res = client
-        .post(url)
-        .multipart(form)
-        .send()
-        .await?
-        .json::<CreateRes>()
-        .await?;
-    match res.cause {
-        Some(cause) => Err(anyhow::anyhow!("{}: {}", res.msg, cause)),
-        None => Ok(res.msg),
+    let res = client.post(url).multipart(form).send().await?;
+
+    match res.error_for_status() {
+        Ok(res) => Ok(res.json::<CreateRes>().await?.msg),
+        Err(res) => Err(anyhow!("{}", res.to_string())),
     }
 }
 

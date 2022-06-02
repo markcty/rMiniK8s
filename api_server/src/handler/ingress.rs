@@ -25,7 +25,14 @@ pub async fn create(
         ingress.metadata.uid = Some(Uuid::new_v4());
 
         for rule in ingress.spec.rules.iter_mut() {
-            if rule.host.is_none() {
+            if let Some(ref host) = rule.host {
+                if !host.ends_with(".minik8s.com") {
+                    return Err(ErrResponse::new(
+                        format!("Error host {}. Host should ends with .minik8s.com", host),
+                        None,
+                    ));
+                }
+            } else {
                 rule.host = Some(gen_rand_host());
             }
         }
