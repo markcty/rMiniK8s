@@ -1,4 +1,4 @@
-use std::{collections::HashMap, default::Default};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,7 +9,6 @@ use super::{Metadata, Object};
 pub struct Workflow {
     pub metadata: Metadata,
     pub spec: WorkflowSpec,
-    pub status: Option<WorkflowStatus>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -19,13 +18,6 @@ pub struct WorkflowSpec {
     pub start_at: String,
     /// An object containing a comma-delimited set of states.
     pub states: HashMap<String, State>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkflowStatus {
-    pub current_state: String,
-    pub current_result: String,
 }
 
 impl Object for Workflow {

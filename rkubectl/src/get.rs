@@ -271,18 +271,12 @@ impl Arg {
                 }
             },
             ResourceKind::Workflows => {
-                println!("{:<16} {:<10} {:<10} HOST", "NAME", "START", "CURRENT");
+                println!("{:<10} HOST", "Name");
                 for object in data {
                     if let Workflow(workflow) = object {
-                        let status = workflow.status.expect("Workflow has no status");
-                        let current =
-                            format!("{}({})", status.current_state, status.current_result);
                         println!(
-                            "{:<16} {:<10} {:<10} {}.func.minik8s.com",
-                            workflow.metadata.name,
-                            workflow.spec.start_at,
-                            current,
-                            workflow.metadata.name
+                            "{:<10} {}.workflow.func.minik8s.com",
+                            workflow.metadata.name, workflow.metadata.name,
                         );
                     }
                 }
