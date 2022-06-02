@@ -157,7 +157,7 @@ impl Arg {
             ResourceKind::HorizontalPodAutoscalers => {
                 println!(
                     "{:<16} {:<24} {:<8} {:<8} {:<}",
-                    "NAME", "REFERENCE", "CURRENT", "DESIRED", "LAST SCALE"
+                    "NAME", "REFERENCE", "CURRENT", "DESIRED", "LAST-SCALE"
                 );
                 for object in data {
                     if let HorizontalPodAutoscaler(hpa) = object {
@@ -203,7 +203,7 @@ impl Arg {
             ResourceKind::Nodes => {
                 println!(
                     "{:<16} {:<16} {:<}",
-                    "NAME", "LAST HEARTBEAT", "INTERNAL IP"
+                    "NAME", "LAST HEARTBEAT", "INTERNAL-IP"
                 );
                 for object in data {
                     if let Node(node) = object {
@@ -221,8 +221,8 @@ impl Arg {
             },
             ResourceKind::Functions => {
                 println!(
-                    "{:<16} {:<10} {:<8} {:<8} {:<8}",
-                    "NAME", "STATUS", "CURRENT", "DESIRED", "LAST SCALE"
+                    "{:<16} {:<10} {:<8} {:<8} {:<16} HOST",
+                    "NAME", "STATUS", "CURRENT", "DESIRED", "LAST-SCALE"
                 );
                 for object in data {
                     if let Function(func) = object {
@@ -256,7 +256,7 @@ impl Arg {
                         };
 
                         println!(
-                            "{:<16} {:<10} {:<8} {:<8} {:<8}",
+                            "{:<16} {:<10} {:<8} {:<8} {:<16} {}",
                             func.metadata.name,
                             state,
                             hpa_status.current_replicas,
@@ -264,21 +264,25 @@ impl Arg {
                             hpa_status
                                 .last_scale_time
                                 .map(calc_age)
-                                .unwrap_or_else(|| "Never".to_string())
+                                .unwrap_or_else(|| "Never".to_string()),
+                            status.host
                         );
                     }
                 }
             },
             ResourceKind::Workflows => {
-                println!("{:<16} {:<10} {:<}", "NAME", "START", "CURRENT");
+                println!("{:<16} {:<10} {:<10} HOST", "NAME", "START", "CURRENT");
                 for object in data {
                     if let Workflow(workflow) = object {
                         let status = workflow.status.expect("Workflow has no status");
                         let current =
                             format!("{}({})", status.current_state, status.current_result);
                         println!(
-                            "{:<16} {:<10} {:<}",
-                            workflow.metadata.name, workflow.spec.start_at, current
+                            "{:<16} {:<10} {:<10} {}.func.minik8s.com",
+                            workflow.metadata.name,
+                            workflow.spec.start_at,
+                            current,
+                            workflow.metadata.name
                         );
                     }
                 }
