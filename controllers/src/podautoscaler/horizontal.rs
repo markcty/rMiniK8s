@@ -182,12 +182,6 @@ impl PodAutoscaler {
                             replicas: current_replicas,
                             time: now,
                         });
-                    self.record_scale_event(
-                        hpa_name,
-                        &hpa.spec.behavior,
-                        status.current_replicas,
-                        current_replicas,
-                    );
                 }
 
                 let desired_replicas = if current_replicas == 0 {
@@ -232,6 +226,12 @@ impl PodAutoscaler {
                         target.name(),
                         current_replicas,
                         desired_replicas
+                    );
+                    self.record_scale_event(
+                        hpa_name,
+                        &hpa.spec.behavior,
+                        current_replicas,
+                        desired_replicas,
                     );
                 }
                 let new_status = HorizontalPodAutoscalerStatus {
@@ -447,6 +447,10 @@ impl PodAutoscaler {
         for policy in &rules.policies {
             let replicas_added_in_current_period =
                 self.get_replicas_change_in_period(policy.period_seconds, events);
+            tracing::debug!(
+                "Replicas added in current period: {}",
+                replicas_added_in_current_period
+            );
             let period_start = current_replicas - replicas_added_in_current_period;
             let period_limit = match policy.type_ {
                 ScalingPolicyType::Pods => period_start + policy.value,
@@ -477,6 +481,10 @@ impl PodAutoscaler {
         for policy in &rules.policies {
             let replicas_deleted_in_current_period =
                 self.get_replicas_change_in_period(policy.period_seconds, events);
+            tracing::debug!(
+                "Replicas deleted in current period: {}",
+                replicas_deleted_in_current_period
+            );
             let period_start = current_replicas + replicas_deleted_in_current_period;
             let period_limit = match policy.type_ {
                 ScalingPolicyType::Pods => {
@@ -525,6 +533,7 @@ impl PodAutoscaler {
             prev_replicas,
             new_replicas
         );
+        let now = Local::now().naive_utc();
         match new_replicas.cmp(&prev_replicas) {
             // Scaling up
             Ordering::Greater => {
@@ -537,7 +546,7 @@ impl PodAutoscaler {
                     .or_insert_with(LinkedList::new)
                     .push_back(ScaleEvent {
                         change: new_replicas - prev_replicas,
-                        time: Local::now().naive_utc(),
+                        time: now,
                     });
             },
             // Scaling down
@@ -551,10 +560,10 @@ impl PodAutoscaler {
                     .or_insert_with(LinkedList::new)
                     .push_back(ScaleEvent {
                         change: prev_replicas - new_replicas,
-                        time: Local::now().naive_utc(),
+                        time: now,
                     });
             },
-            Ordering::Equal => unreachable!(),
+            Ordering::Equal => {},
         }
     }
 
@@ -565,6 +574,7 @@ impl PodAutoscaler {
             .front()
             .map_or(false, |event| event.time < period_start)
         {
+            tracing::debug!("Discard outdated scale event: {:?}", events.front());
             events.pop_front();
         }
     }
