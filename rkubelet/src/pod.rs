@@ -188,6 +188,7 @@ impl Pod {
             image: Some(image.name().to_owned()),
             host_config,
             labels: Some(labels),
+            exposed_ports: Some(self.spec.exposed_ports()),
             ..Default::default()
         };
         let name = Some(self.get_container_name(SANDBOX_NAME));

@@ -186,6 +186,14 @@ impl PodSpec {
             "bridge".to_string()
         }
     }
+
+    pub fn exposed_ports(&self) -> HashMap<String, HashMap<(), ()>> {
+        let mut ports = HashMap::new();
+        for container in &self.containers {
+            ports.extend(container.exposed_ports());
+        }
+        ports
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -279,6 +287,14 @@ impl Container {
                 }
             },
         }
+    }
+
+    pub fn exposed_ports(&self) -> HashMap<String, HashMap<(), ()>> {
+        let mut ports = HashMap::new();
+        for port in &self.ports {
+            ports.insert(format!("{}/tcp", port.container_port), HashMap::new());
+        }
+        ports
     }
 }
 
