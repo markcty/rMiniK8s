@@ -1,5 +1,5 @@
 kind: Node
 metadata:
-  name: dev
+  name: k8s1
   labels:
     gpu: nvidia
