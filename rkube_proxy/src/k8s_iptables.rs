@@ -338,6 +338,7 @@ mod test {
 
     use super::K8sIpTables;
 
+    #[ignore]
     #[test]
     fn svc() {
         let mut ipt = K8sIpTables::new();
