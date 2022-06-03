@@ -20,6 +20,7 @@ job("Run tests & Build") {
                 rustup component add clippy
                 echo Running tests...
                 cargo clippy -- -Dwarnings
+                cargo test
             """
         }
     }
@@ -53,6 +54,9 @@ job("Build docker images") {
                     curl -F "rkubectl=@rkubectl" http://minik8s.xyz:8008/api/upload
                     curl -F "rkubelet=@rkubelet" http://minik8s.xyz:8008/api/upload
                     curl -F "scheduler=@scheduler" http://minik8s.xyz:8008/api/upload
+                    curl -F "function-controller=@function-controller" http://minik8s.xyz:8008/api/upload
+                    curl -F "serverless-router=@serverless-router" http://minik8s.xyz:8008/api/upload
+                    curl -F "gpujob-controller=@gpujob-controller" http://minik8s.xyz:8008/api/upload
                 """
         }
     }
@@ -104,18 +108,39 @@ job("Build docker images") {
 
     docker {
         build {
-            file = "./scripts/x86/docker/rkubelet/Dockerfile"
+            file = "./scripts/x86/docker/scheduler/Dockerfile"
         }
-        push("minik8s.xyz/rkubelet") {
+        push("minik8s.xyz/scheduler") {
             tags("latest")
         }
     }
 
     docker {
         build {
-            file = "./scripts/x86/docker/scheduler/Dockerfile"
+            context = "./scripts/x86/docker/function-controller"
+            file = "./scripts/x86/docker/function-controller/Dockerfile"
         }
-        push("minik8s.xyz/scheduler") {
+        push("minik8s.xyz/function-controller") {
+            tags("latest")
+        }
+    }
+
+    docker {
+        build {
+            context = "./scripts/x86/docker/serverless-router"
+            file = "./scripts/x86/docker/serverless-router/Dockerfile"
+        }
+        push("minik8s.xyz/serverless-router") {
+            tags("latest")
+        }
+    }
+
+    docker {
+        build {
+            context = "./scripts/x86/docker/gpujob-controller"
+            file = "./scripts/x86/docker/gpujob-controller/Dockerfile"
+        }
+        push("minik8s.xyz/gpujob-controller") {
             tags("latest")
         }
     }
