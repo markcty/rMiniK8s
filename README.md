@@ -1,55 +1,24 @@
-# minik-8-s/rminik8s
+# rMiniK8s
+
+A simple containerized application manage system like Kubernetes, but written in Rust.
+
+Course Project for SJTU-SE3356, 2022.
+
+## Architecture Overview
+
+![image](assests/Control_Plane.png)
+![image](assests/Worker.png)
+
+Refer to [Pre.key](assests/Pre.key) and [Doc.pages](assests/Doc.pages) for further information.
 
 ## Getting Started
 
-Download links:
+Use `./scripts/ARCH/master/up.sh` to deploy the control plane and `./scripts/ARCH/node/up.sh` to deploy a node.
 
-SSH clone URL: ssh://git@git.jetbrains.space/minik8s/minik-8-s/rminik8s.git
+P.S. You may want to build the dependencies(docker images, binaries) and set up a local registry first. Refer to the script for further information.
 
-HTTPS clone URL: <https://git.jetbrains.space/minik8s/minik-8-s/rminik8s.git>
+## License
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing
-purposes.
+This project is licensed under the [GPL license].
 
-## Prerequisites
-
-What things you need to install the software and how to install them.
-
-```
-docker
-```
-
-## Deployment
-
-### Master
-
-```shell
-# please run in root
-bash <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy-master.sh)
-```
-
-### Node
-
-在部署node之前需要保证ETCD中写入以下规则，并且启用v2 API（在ETCD启动参数中加入–enable-v2）：
-
-```shell
-ETCDCTL_API=2 etcdctl set /coreos.com/network/config '{ "Network": "10.5.0.0/16", "Backend": {"Type": "vxlan"}}'
-```
-
-建议使用multipass起虚拟机来测试，启动带docker的multipass：
-
-```shell
-multipass launch docker -n k8s1
-multipass shell k8s1
-```
-
-在虚拟机中运行以下命令部署node，其间会要求输入配置：
-
-```shell
-# please run in root
-bash <(curl -s https://s3.jcloud.sjtu.edu.cn/1b088ff214b04e6291c549a95685610b-share/deploy-node.sh)
-```
-
-## Resources
-
-Add links to external resources for this project, such as CI server, bug tracker, etc.
+[GPL license]: https://github.com/markcty/rMiniK8s/blob/main/LICENCE
